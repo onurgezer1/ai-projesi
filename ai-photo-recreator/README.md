@@ -141,6 +141,66 @@ CREATE TABLE wp_ai_photo_history (
 
 ## Support
 
+### Troubleshooting "An error occurred"
+
+If you encounter the error "An error occurred" when processing photos, follow these troubleshooting steps:
+
+#### 1. System Requirements Check
+Ensure your system meets the requirements:
+```bash
+# Check GD extension
+php -m | grep -i gd
+
+# Check PHP version
+php -v
+```
+
+#### 2. Directory Permissions
+The plugin requires writable directories:
+- `wp-content/uploads/` (755 permissions)
+- `wp-content/uploads/ai-photo-recreator/` (755 permissions)
+- Subdirectories: `original/`, `processed/`, `temp/` (755 permissions)
+
+#### 3. Debug Test
+Use the included `debug-test.php` file by copying it to your WordPress root and accessing it via browser:
+```
+https://yourdomain.com/debug-test.php
+```
+
+#### 4. Server Error Logs
+Check your server error logs:
+- cPanel → Error Logs
+- `/var/log/apache2/error.log` (Linux)
+- WordPress debug logs (`wp-content/debug.log`)
+
+#### 5. Enable WordPress Debug
+Add these lines to your `wp-config.php`:
+```php
+define('WP_DEBUG', true);
+define('WP_DEBUG_LOG', true);
+define('WP_DEBUG_DISPLAY', false);
+```
+
+#### Common Issues and Solutions
+
+| Issue | Solution |
+|-------|----------|
+| Missing GD extension | Contact your hosting provider |
+| Permission errors | Check file/folder permissions (755/644) |
+| Plugin conflicts | Test with other plugins disabled |
+| Theme conflicts | Test with default theme |
+| Database errors | Deactivate and reactivate plugin |
+
+#### Manual Directory Creation
+If automatic directory creation fails:
+```bash
+mkdir -p wp-content/uploads/ai-photo-recreator/original
+mkdir -p wp-content/uploads/ai-photo-recreator/processed  
+mkdir -p wp-content/uploads/ai-photo-recreator/temp
+chmod 755 wp-content/uploads/ai-photo-recreator/
+chmod 755 wp-content/uploads/ai-photo-recreator/*
+```
+
 For support and feature requests, please create an issue on the project repository.
 
 ## License
