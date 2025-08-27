@@ -156,7 +156,9 @@ class AI_Photo_Processor {
             
             // Get API key from settings
             $options = get_option('ai_photo_recreator_options', array());
-            $api_key = isset($options['api_key']) ? $options['api_key'] : '';
+            $api_key = isset($options['api_key']) ? trim($options['api_key']) : '';
+            
+            error_log('AI Photo Recreator: API Key present: ' . (!empty($api_key) ? 'YES' : 'NO'));
             
             $file_info = pathinfo($file_path);
             $processed_filename = 'processed_' . time() . '_' . $file_info['filename'] . '.' . $file_info['extension'];
@@ -187,13 +189,19 @@ class AI_Photo_Processor {
                 }
             }
             
+            error_log('AI Photo Recreator: Starting OpenAI processing with instructions: ' . $instructions);
+            
             // Try OpenAI DALL-E processing
             $ai_result = $this->process_with_openai($file_path, $instructions, $api_key);
+            
+            error_log('AI Photo Recreator: OpenAI processing result: ' . ($ai_result['success'] ? 'SUCCESS' : 'FAILED - ' . $ai_result['message']));
             
             if ($ai_result['success']) {
                 // Save the processed image
                 if (file_put_contents($processed_path, $ai_result['image_data'])) {
                     $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
+                    
+                    error_log('AI Photo Recreator: Successfully saved AI-processed image to ' . $processed_path);
                     
                     return array(
                         'success' => true,
@@ -203,7 +211,8 @@ class AI_Photo_Processor {
                             'action' => 'ai_photo_download',
                             'file' => urlencode($processed_filename),
                             'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
-                        ), admin_url('admin-ajax.php'))
+                        ), admin_url('admin-ajax.php')),
+                        'message' => __('Photo successfully transformed using OpenAI DALL-E!', 'ai-photo-recreator')
                     );
                 } else {
                     return array(
@@ -227,12 +236,12 @@ class AI_Photo_Processor {
                             'file' => urlencode($processed_filename),
                             'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
                         ), admin_url('admin-ajax.php')),
-                        'message' => sprintf(__('AI processing failed (%s). Using enhanced fallback processing.', 'ai-photo-recreator'), $ai_result['message'])
+                        'message' => sprintf(__('OpenAI processing failed (%s). Applied enhanced fallback processing. Check debug-openai-test.php for API diagnostics.', 'ai-photo-recreator'), $ai_result['message'])
                     );
                 } else {
                     return array(
                         'success' => false,
-                        'message' => sprintf(__('AI processing failed: %s', 'ai-photo-recreator'), $ai_result['message'])
+                        'message' => sprintf(__('OpenAI processing failed: %s. Enhanced fallback also failed. Check debug-openai-test.php for diagnostics.', 'ai-photo-recreator'), $ai_result['message'])
                     );
                 }
             }
@@ -328,7 +337,7 @@ class AI_Photo_Processor {
             );
             
             $body = array(
-                'model' => 'gpt-4-vision-preview',
+                'model' => 'gpt-4o',
                 'messages' => array(
                     array(
                         'role' => 'user',
@@ -337,15 +346,15 @@ class AI_Photo_Processor {
                                 'type' => 'text',
                                 'text' => 'Analyze this image in great detail for AI image recreation. Provide a comprehensive description structured as follows:
 
-SUBJECTS: Describe all people, their physical characteristics, clothing, poses, expressions, and positions
-SETTING: Detailed description of the location, environment, and background elements  
-LIGHTING: Type of lighting, direction, intensity, shadows, and overall mood
-COLORS: Dominant colors, color palette, and color temperature
+SUBJECTS: Describe all people, their physical characteristics, clothing, poses, expressions, and positions in detail
+SETTING: Detailed description of the location, environment, and background elements including architecture, landscape, objects
+LIGHTING: Type of lighting, direction, intensity, shadows, and overall mood - be very specific about light quality
+COLORS: Dominant colors, color palette, and color temperature throughout the scene
 COMPOSITION: Camera angle, framing, depth of field, and photographic style
 ATMOSPHERE: Weather conditions, season, time of day, and environmental factors
 STYLE: Photography type (portrait, landscape, candid, etc.) and artistic qualities
 
-Be extremely specific and detailed as this will be used to recreate the exact scene with modifications.'
+Be extremely specific and detailed as this will be used to recreate the exact scene with comprehensive modifications.'
                             ),
                             array(
                                 'type' => 'image_url',
@@ -356,7 +365,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                         )
                     )
                 ),
-                'max_tokens' => 800
+                'max_tokens' => 1200
             );
             
             $args = array(
@@ -369,6 +378,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             $response = wp_remote_request($api_url, $args);
             
             if (is_wp_error($response)) {
+                error_log('AI Photo Recreator Vision API: WP Error - ' . $response->get_error_message());
                 return array(
                     'success' => false,
                     'message' => $response->get_error_message()
@@ -378,9 +388,14 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             $response_code = wp_remote_retrieve_response_code($response);
             $response_body = wp_remote_retrieve_body($response);
             
+            error_log('AI Photo Recreator Vision API: Response Code - ' . $response_code);
+            
             if ($response_code !== 200) {
                 $error_data = json_decode($response_body, true);
                 $error_message = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'Unknown API error';
+                
+                error_log('AI Photo Recreator Vision API: Error - ' . $error_message);
+                error_log('AI Photo Recreator Vision API: Full response - ' . $response_body);
                 
                 return array(
                     'success' => false,
@@ -423,14 +438,15 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         $instructions = strtolower(trim($instructions));
         $transformations = array();
         
-        // Weather and environmental transformations
-        if (strpos($instructions, 'snow') !== false) {
+        // Weather and environmental transformations (with Turkish support)
+        if (strpos($instructions, 'snow') !== false || strpos($instructions, 'kar') !== false || strpos($instructions, 'kış') !== false) {
             $transformations['environment'] = 'winter';
-            $transformations['weather'] = 'snowy';
-            $transformations['background'] = 'snowy landscape with falling snow';
-            $transformations['atmosphere'] = 'cold, crisp winter atmosphere with overcast sky';
-            $transformations['lighting'] = 'soft, diffused winter lighting';
-            $transformations['effects'] = array('snow falling', 'frost on surfaces', 'winter clothing if appropriate');
+            $transformations['weather'] = 'heavy snowfall';
+            $transformations['background'] = 'completely transform to a snowy winter landscape with snow-covered ground, falling snow, and winter environment';
+            $transformations['atmosphere'] = 'cold, crisp winter atmosphere with overcast snowy sky and visible snowfall';
+            $transformations['lighting'] = 'soft, diffused winter lighting typical of snowy weather';
+            $transformations['effects'] = array('heavy snow falling from the sky', 'snow accumulation on all surfaces', 'frost and ice effects', 'winter atmosphere', 'cold color temperature');
+            $transformations['comprehensive'] = true;
         }
         
         elseif (strpos($instructions, 'rain') !== false) {
@@ -537,48 +553,90 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         // Parse instructions to understand what transformations are needed
         $transformations = $this->parse_transformation_instructions($user_instructions);
         
-        // Start with the base image description
-        $prompt = "Create a photorealistic image with the following base elements from the original: " . $image_description;
-        
-        // Apply comprehensive transformations
-        if (!empty($transformations)) {
-            $prompt .= "\n\nNow apply these comprehensive transformations:";
+        // Create a comprehensive prompt for dramatic transformation
+        if (isset($transformations['comprehensive']) && $transformations['comprehensive']) {
+            // For comprehensive transformations like snow/weather changes
+            $prompt = "Create a photorealistic image that recreates the EXACT same subjects, poses, and composition from this description: " . $image_description;
+            
+            $prompt .= "\n\nNow apply these DRAMATIC and COMPREHENSIVE environmental transformations:";
             
             // Environment and background changes
             if (isset($transformations['background'])) {
-                $prompt .= "\n- BACKGROUND: Completely transform the background to: " . $transformations['background'];
+                $prompt .= "\n- COMPLETELY CHANGE BACKGROUND: " . $transformations['background'];
+            }
+            
+            // Weather transformation
+            if (isset($transformations['weather'])) {
+                $prompt .= "\n- WEATHER CONDITIONS: Add intense " . $transformations['weather'] . " throughout the entire scene";
             }
             
             // Atmospheric changes
             if (isset($transformations['atmosphere'])) {
-                $prompt .= "\n- ATMOSPHERE: Change the overall atmosphere to: " . $transformations['atmosphere'];
+                $prompt .= "\n- ATMOSPHERIC CHANGE: Transform to " . $transformations['atmosphere'];
             }
             
             // Lighting changes
             if (isset($transformations['lighting'])) {
-                $prompt .= "\n- LIGHTING: Adjust lighting to: " . $transformations['lighting'];
-            }
-            
-            // Environmental effects
-            if (isset($transformations['weather'])) {
-                $prompt .= "\n- WEATHER: Add " . $transformations['weather'] . " weather conditions";
+                $prompt .= "\n- LIGHTING TRANSFORMATION: Change to " . $transformations['lighting'];
             }
             
             // Visual effects
             if (isset($transformations['effects']) && is_array($transformations['effects'])) {
-                $prompt .= "\n- EFFECTS: Include these visual elements: " . implode(', ', $transformations['effects']);
+                $prompt .= "\n- VISUAL EFFECTS: " . implode(', ', $transformations['effects']);
             }
             
-            // Style modifications
-            if (isset($transformations['style'])) {
-                $prompt .= "\n- STYLE: Apply " . $transformations['style'] . " photographic style";
-            }
+            $prompt .= "\n\nCRITICAL REQUIREMENTS:";
+            $prompt .= "\n- Keep the EXACT same people, their poses, expressions, and positioning";
+            $prompt .= "\n- Maintain the same camera angle and composition";
+            $prompt .= "\n- Make the environmental transformation DRAMATIC and COMPREHENSIVE";
+            $prompt .= "\n- The transformation must be immediately obvious and striking";
+            $prompt .= "\n- Apply the changes to the ENTIRE scene, not just overlays";
+            $prompt .= "\n- Create a completely new environment while preserving the subjects";
+            
         } else {
-            // If no specific transformations detected, use original instructions
-            $prompt .= "\n\nApply these modifications while maintaining realism: " . sanitize_text_field($user_instructions);
+            // Start with the base image description for other transformations
+            $prompt = "Create a photorealistic image with the following base elements from the original: " . $image_description;
+            
+            // Apply other transformations
+            if (!empty($transformations)) {
+                $prompt .= "\n\nNow apply these comprehensive transformations:";
+                
+                // Environment and background changes
+                if (isset($transformations['background'])) {
+                    $prompt .= "\n- BACKGROUND: Completely transform the background to: " . $transformations['background'];
+                }
+                
+                // Atmospheric changes
+                if (isset($transformations['atmosphere'])) {
+                    $prompt .= "\n- ATMOSPHERE: Change the overall atmosphere to: " . $transformations['atmosphere'];
+                }
+                
+                // Lighting changes
+                if (isset($transformations['lighting'])) {
+                    $prompt .= "\n- LIGHTING: Adjust lighting to: " . $transformations['lighting'];
+                }
+                
+                // Environmental effects
+                if (isset($transformations['weather'])) {
+                    $prompt .= "\n- WEATHER: Add " . $transformations['weather'] . " weather conditions";
+                }
+                
+                // Visual effects
+                if (isset($transformations['effects']) && is_array($transformations['effects'])) {
+                    $prompt .= "\n- EFFECTS: Include these visual elements: " . implode(', ', $transformations['effects']);
+                }
+                
+                // Style modifications
+                if (isset($transformations['style'])) {
+                    $prompt .= "\n- STYLE: Apply " . $transformations['style'] . " photographic style";
+                }
+            } else {
+                // If no specific transformations detected, use original instructions
+                $prompt .= "\n\nApply these modifications while maintaining realism: " . sanitize_text_field($user_instructions);
+            }
+            
+            $prompt .= "\n\nIMPORTANT: Keep the same subjects, poses, and basic composition from the original image while applying these environmental and atmospheric transformations. Ensure all changes look natural and photorealistic. The transformation should be comprehensive and dramatically visible.";
         }
-        
-        $prompt .= "\n\nIMPORTANT: Keep the same subjects, poses, and basic composition from the original image while applying these environmental and atmospheric transformations. Ensure all changes look natural and photorealistic. The transformation should be comprehensive and dramatically visible.";
         
         return $prompt;
     }
@@ -618,6 +676,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             $response = wp_remote_request($api_url, $args);
             
             if (is_wp_error($response)) {
+                error_log('AI Photo Recreator DALL-E API: WP Error - ' . $response->get_error_message());
                 return array(
                     'success' => false,
                     'message' => $response->get_error_message()
@@ -627,9 +686,14 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             $response_code = wp_remote_retrieve_response_code($response);
             $response_body = wp_remote_retrieve_body($response);
             
+            error_log('AI Photo Recreator DALL-E API: Response Code - ' . $response_code);
+            
             if ($response_code !== 200) {
                 $error_data = json_decode($response_body, true);
                 $error_message = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'Unknown API error';
+                
+                error_log('AI Photo Recreator DALL-E API: Error - ' . $error_message);
+                error_log('AI Photo Recreator DALL-E API: Full response - ' . $response_body);
                 
                 return array(
                     'success' => false,
