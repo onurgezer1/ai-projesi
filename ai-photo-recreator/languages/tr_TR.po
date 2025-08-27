@@ -1,0 +1,467 @@
+# AI Photo Recreator - Turkish Language File
+# Text Domain: ai-photo-recreator
+
+msgid ""
+msgstr ""
+"Project-Id-Version: AI Photo Recreator 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-01-01 12:00+0000\n"
+"PO-Revision-Date: 2024-01-01 12:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: tr_TR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+# Plugin information
+msgid "AI Photo Recreator"
+msgstr "AI Fotoğraf Yeniden Oluşturucu"
+
+msgid "WordPress yapay zeka fotoğraf yeniden oluşturma plugin'i. Kullanıcıların yüklediği fotoğrafları belirtilen talimatlara göre AI ile yeniden oluşturur."
+msgstr "WordPress yapay zeka fotoğraf yeniden oluşturma plugin'i. Kullanıcıların yüklediği fotoğrafları belirtilen talimatlara göre AI ile yeniden oluşturur."
+
+# General terms
+msgid "Settings"
+msgstr "Ayarlar"
+
+msgid "History"
+msgstr "Geçmiş"
+
+msgid "Process Photo"
+msgstr "Fotoğrafı İşle"
+
+msgid "Processing..."
+msgstr "İşleniyor..."
+
+msgid "An error occurred"
+msgstr "Bir hata oluştu"
+
+msgid "Photo processed successfully"
+msgstr "Fotoğraf başarıyla işlendi"
+
+msgid "Security check failed"
+msgstr "Güvenlik kontrolü başarısız"
+
+# File upload
+msgid "Select Photo"
+msgstr "Fotoğraf Seç"
+
+msgid "Please select a file"
+msgstr "Lütfen bir dosya seçin"
+
+msgid "No file was uploaded"
+msgstr "Hiçbir dosya yüklenmedi"
+
+msgid "File is too large"
+msgstr "Dosya çok büyük"
+
+msgid "File was only partially uploaded"
+msgstr "Dosya yalnızca kısmen yüklendi"
+
+msgid "Missing temporary folder"
+msgstr "Geçici klasör eksik"
+
+msgid "Failed to write file to disk"
+msgstr "Dosya diske yazılamadı"
+
+msgid "File upload stopped by extension"
+msgstr "Dosya yüklemesi uzantı tarafından durduruldu"
+
+msgid "Unknown upload error"
+msgstr "Bilinmeyen yükleme hatası"
+
+msgid "File size exceeds maximum allowed size of %s"
+msgstr "Dosya boyutu izin verilen maksimum boyutu aştı: %s"
+
+msgid "File type not allowed. Allowed types: %s"
+msgstr "Dosya türüne izin verilmiyor. İzin verilen türler: %s"
+
+msgid "File is not a valid image"
+msgstr "Dosya geçerli bir resim değil"
+
+msgid "Image dimensions exceed maximum allowed size of %dx%d pixels"
+msgstr "Resim boyutları izin verilen maksimum boyutu aştı: %dx%d piksel"
+
+msgid "File is valid"
+msgstr "Dosya geçerli"
+
+msgid "File uploaded successfully"
+msgstr "Dosya başarıyla yüklendi"
+
+msgid "Failed to save uploaded file"
+msgstr "Yüklenen dosya kaydedilemedi"
+
+msgid "An error occurred while saving the file"
+msgstr "Dosya kaydedilirken bir hata oluştu"
+
+msgid "Max file size: %s. Allowed formats: %s"
+msgstr "Maksimum dosya boyutu: %s. İzin verilen formatlar: %s"
+
+# Instructions
+msgid "Instructions"
+msgstr "Talimatlar"
+
+msgid "Please enter instructions"
+msgstr "Lütfen talimatlar girin"
+
+msgid "Describe how you want the photo to be recreated..."
+msgstr "Fotoğrafın nasıl yeniden oluşturulmasını istediğinizi açıklayın..."
+
+msgid "Examples: \"Make this person smile\", \"Change background to nature\", \"Convert to vintage style\""
+msgstr "Örnekler: \"Bu kişiyi gülümser hale getir\", \"Arka planı doğa manzarasıyla değiştir\", \"Vintage tarzına çevir\""
+
+# Processing
+msgid "Rate limit exceeded. Please try again later."
+msgstr "Hız sınırı aşıldı. Lütfen daha sonra tekrar deneyin."
+
+msgid "Failed to process image"
+msgstr "Resim işlenemedi"
+
+msgid "An error occurred during processing"
+msgstr "İşlem sırasında bir hata oluştu"
+
+msgid "Processing your photo..."
+msgstr "Fotoğrafınız işleniyor..."
+
+msgid "Processing your photo, please wait..."
+msgstr "Fotoğrafınız işleniyor, lütfen bekleyin..."
+
+# Results
+msgid "Results"
+msgstr "Sonuçlar"
+
+msgid "Original"
+msgstr "Orijinal"
+
+msgid "AI Processed"
+msgstr "AI İşlenmiş"
+
+msgid "Download"
+msgstr "İndir"
+
+msgid "Download Processed Image"
+msgstr "İşlenmiş Resmi İndir"
+
+msgid "Try Again"
+msgstr "Tekrar Dene"
+
+msgid "Original Photo"
+msgstr "Orijinal Fotoğraf"
+
+msgid "AI Processed Photo"
+msgstr "AI İşlenmiş Fotoğraf"
+
+# User permissions
+msgid "You do not have permission to upload files"
+msgstr "Dosya yükleme izniniz yok"
+
+msgid "You need to be logged in to use this feature."
+msgstr "Bu özelliği kullanmak için giriş yapmanız gerekir."
+
+msgid "You need to be logged in to view your history."
+msgstr "Geçmişinizi görüntülemek için giriş yapmanız gerekir."
+
+msgid "You do not have sufficient permissions to access this page."
+msgstr "Bu sayfaya erişmek için yeterli izniniz yok."
+
+# Admin interface
+msgid "Usage Statistics"
+msgstr "Kullanım İstatistikleri"
+
+msgid "Total Processed"
+msgstr "Toplam İşlenen"
+
+msgid "Currently Processing"
+msgstr "Şu Anda İşleniyor"
+
+msgid "Errors"
+msgstr "Hatalar"
+
+msgid "Processed Today"
+msgstr "Bugün İşlenen"
+
+msgid "Quick Actions"
+msgstr "Hızlı İşlemler"
+
+msgid "Plugin Settings"
+msgstr "Plugin Ayarları"
+
+msgid "View History"
+msgstr "Geçmişi Görüntüle"
+
+msgid "Cleanup Old Files"
+msgstr "Eski Dosyaları Temizle"
+
+msgid "How to Use"
+msgstr "Nasıl Kullanılır"
+
+msgid "Frontend Usage"
+msgstr "Ön Yüz Kullanımı"
+
+msgid "Add the following shortcode to any page or post:"
+msgstr "Aşağıdaki shortcode'u herhangi bir sayfaya veya yazıya ekleyin:"
+
+msgid "Shortcode Parameters"
+msgstr "Shortcode Parametreleri"
+
+msgid "Custom title for the form"
+msgstr "Form için özel başlık"
+
+msgid "Show/hide title (true/false)"
+msgstr "Başlığı göster/gizle (true/false)"
+
+msgid "Maximum width of the form container"
+msgstr "Form konteynerinin maksimum genişliği"
+
+msgid "Example"
+msgstr "Örnek"
+
+msgid "History Shortcode"
+msgstr "Geçmiş Shortcode'u"
+
+msgid "Show user processing history:"
+msgstr "Kullanıcı işlem geçmişini göster:"
+
+# Settings page
+msgid "Settings saved successfully."
+msgstr "Ayarlar başarıyla kaydedildi."
+
+msgid "General Settings"
+msgstr "Genel Ayarlar"
+
+msgid "Enable Frontend"
+msgstr "Ön Yüzü Etkinleştir"
+
+msgid "Enable the shortcode functionality for frontend use."
+msgstr "Ön yüz kullanımı için shortcode işlevselliğini etkinleştirin."
+
+msgid "Require Login"
+msgstr "Giriş Gerektir"
+
+msgid "Require users to be logged in to use the photo recreation feature."
+msgstr "Fotoğraf yeniden oluşturma özelliğini kullanmak için kullanıcıların giriş yapmasını gerektir."
+
+msgid "File Upload Settings"
+msgstr "Dosya Yükleme Ayarları"
+
+msgid "Maximum File Size (MB)"
+msgstr "Maksimum Dosya Boyutu (MB)"
+
+msgid "Maximum file size for uploads. Server limit: %s"
+msgstr "Yüklemeler için maksimum dosya boyutu. Sunucu sınırı: %s"
+
+msgid "Allowed File Formats"
+msgstr "İzin Verilen Dosya Formatları"
+
+msgid "Select which image formats are allowed for upload."
+msgstr "Yükleme için hangi resim formatlarına izin verileceğini seçin."
+
+msgid "Rate Limiting"
+msgstr "Hız Sınırlaması"
+
+msgid "Requests Per Hour"
+msgstr "Saatte İstek"
+
+msgid "Maximum number of photo processing requests per user per hour."
+msgstr "Kullanıcı başına saatte maksimum fotoğraf işleme isteği sayısı."
+
+msgid "AI Service Settings"
+msgstr "AI Servis Ayarları"
+
+msgid "API Key"
+msgstr "API Anahtarı"
+
+msgid "API key for the AI service (e.g., OpenAI, Stable Diffusion, etc.). Leave empty to use mock processing."
+msgstr "AI servisi için API anahtarı (ör. OpenAI, Stable Diffusion vb.). Mock işlem kullanmak için boş bırakın."
+
+msgid "Show"
+msgstr "Göster"
+
+msgid "Hide"
+msgstr "Gizle"
+
+msgid "File Management"
+msgstr "Dosya Yönetimi"
+
+msgid "Auto Cleanup Days"
+msgstr "Otomatik Temizleme Günleri"
+
+msgid "Automatically delete processed files older than this many days. Set to 0 to disable auto cleanup."
+msgstr "Bu kadar günden eski işlenmiş dosyaları otomatik olarak sil. Otomatik temizlemeyi devre dışı bırakmak için 0 olarak ayarlayın."
+
+msgid "Storage Info"
+msgstr "Depolama Bilgisi"
+
+msgid "Total Files:"
+msgstr "Toplam Dosya:"
+
+msgid "Total Size:"
+msgstr "Toplam Boyut:"
+
+msgid "Manual Cleanup Now"
+msgstr "Şimdi Manuel Temizle"
+
+msgid "System Information"
+msgstr "Sistem Bilgileri"
+
+msgid "Plugin Version"
+msgstr "Plugin Sürümü"
+
+msgid "WordPress Version"
+msgstr "WordPress Sürümü"
+
+msgid "PHP Version"
+msgstr "PHP Sürümü"
+
+msgid "GD Extension"
+msgstr "GD Uzantısı"
+
+msgid "Installed"
+msgstr "Yüklü"
+
+msgid "Not Installed"
+msgstr "Yüklü Değil"
+
+msgid "Upload Directory"
+msgstr "Yükleme Dizini"
+
+msgid "Writable"
+msgstr "Yazılabilir"
+
+msgid "Not Writable"
+msgstr "Yazılamaz"
+
+# History page
+msgid "Selected records deleted."
+msgstr "Seçili kayıtlar silindi."
+
+msgid "Selected records marked for reprocessing."
+msgstr "Seçili kayıtlar yeniden işleme için işaretlendi."
+
+msgid "All Statuses"
+msgstr "Tüm Durumlar"
+
+msgid "Processing"
+msgstr "İşleniyor"
+
+msgid "Completed"
+msgstr "Tamamlandı"
+
+msgid "Error"
+msgstr "Hata"
+
+msgid "All Users"
+msgstr "Tüm Kullanıcılar"
+
+msgid "User"
+msgstr "Kullanıcı"
+
+msgid "Date From"
+msgstr "Başlangıç Tarihi"
+
+msgid "Date To"
+msgstr "Bitiş Tarihi"
+
+msgid "Filter"
+msgstr "Filtrele"
+
+msgid "Reset"
+msgstr "Sıfırla"
+
+msgid "Showing %d of %d records"
+msgstr "%d kayıt gösteriliyor (toplam %d)"
+
+msgid "filtered"
+msgstr "filtrelenmiş"
+
+msgid "Bulk Actions"
+msgstr "Toplu İşlemler"
+
+msgid "Delete"
+msgstr "Sil"
+
+msgid "Mark for Reprocessing"
+msgstr "Yeniden İşleme İçin İşaretle"
+
+msgid "Apply"
+msgstr "Uygula"
+
+msgid "Are you sure you want to perform this action?"
+msgstr "Bu işlemi gerçekleştirmek istediğinizden emin misiniz?"
+
+msgid "ID"
+msgstr "ID"
+
+msgid "Status"
+msgstr "Durum"
+
+msgid "Created"
+msgstr "Oluşturulma"
+
+msgid "Not completed"
+msgstr "Tamamlanmadı"
+
+msgid "Actions"
+msgstr "İşlemler"
+
+msgid "Unknown User"
+msgstr "Bilinmeyen Kullanıcı"
+
+msgid "Show more"
+msgstr "Daha fazla göster"
+
+msgid "View Images"
+msgstr "Resimleri Görüntüle"
+
+msgid "Are you sure you want to delete this record?"
+msgstr "Bu kaydı silmek istediğinizden emin misiniz?"
+
+msgid "Error deleting record"
+msgstr "Kayıt silinirken hata oluştu"
+
+msgid "No processing history found."
+msgstr "İşlem geçmişi bulunamadı."
+
+msgid "Image Comparison"
+msgstr "Resim Karşılaştırması"
+
+msgid "Processed"
+msgstr "İşlenmiş"
+
+# Cleanup
+msgid "Are you sure you want to cleanup old files? This action cannot be undone."
+msgstr "Eski dosyaları temizlemek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+
+msgid "Cleaning up..."
+msgstr "Temizleniyor..."
+
+msgid "Files cleaned up successfully"
+msgstr "Dosyalar başarıyla temizlendi"
+
+msgid "Files cleaned up successfully. Page will refresh to update storage info."
+msgstr "Dosyalar başarıyla temizlendi. Depolama bilgilerini güncellemek için sayfa yenilenecek."
+
+msgid "Error during cleanup"
+msgstr "Temizlik sırasında hata oluştu"
+
+msgid "Error during cleanup:"
+msgstr "Temizlik sırasında hata:"
+
+msgid "Request failed. Please try again."
+msgstr "İstek başarısız. Lütfen tekrar deneyin."
+
+msgid "Warning: The specified size exceeds the server limit of %s MB."
+msgstr "Uyarı: Belirtilen boyut sunucu sınırını aşıyor: %s MB."
+
+# Download
+msgid "Invalid download request"
+msgstr "Geçersiz indirme isteği"
+
+msgid "File not found"
+msgstr "Dosya bulunamadı"
+
+# History shortcode
+msgid "Processing History"
+msgstr "İşlem Geçmişi"

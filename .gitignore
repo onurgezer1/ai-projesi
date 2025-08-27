@@ -1,0 +1,26 @@
+# Ignore temporary files and logs
+*.log
+*.tmp
+temp/
+
+# Ignore uploaded files (these should be in wp-content/uploads)
+uploads/
+original/
+processed/
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore compiled language files
+*.mo
+
+# Ignore backup files
+*.backup
+*.bak
+*~
