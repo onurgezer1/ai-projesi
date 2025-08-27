@@ -794,6 +794,21 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         elseif (strpos($instructions, 'rain') !== false) {
             $this->add_comprehensive_rain_effect($image_resource, $width, $height);
         }
+        elseif (strpos($instructions, 'sunset') !== false || strpos($instructions, 'golden hour') !== false) {
+            $this->add_sunset_effect($image_resource);
+        }
+        elseif (strpos($instructions, 'night') !== false) {
+            $this->add_night_effect($image_resource);
+        }
+        elseif (strpos($instructions, 'autumn') !== false || strpos($instructions, 'fall') !== false) {
+            $this->add_autumn_effect($image_resource);
+        }
+        elseif (strpos($instructions, 'spring') !== false) {
+            $this->add_spring_effect($image_resource);
+        }
+        elseif (strpos($instructions, 'summer') !== false) {
+            $this->add_summer_effect($image_resource);
+        }
         elseif (strpos($instructions, 'vintage') !== false || strpos($instructions, 'sepia') !== false) {
             $this->add_vintage_effect($image_resource);
         }
