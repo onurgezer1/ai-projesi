@@ -131,40 +131,70 @@ class AI_Photo_Processor {
      * @return array Processing result
      */
     private function ai_process($file_path, $instructions) {
-        // In a real implementation, this would call an AI service like OpenAI DALL-E, Stable Diffusion, etc.
-        // For now, we'll create a mock processed version
-        
-        $upload_dir = wp_upload_dir();
-        $ai_dir = $upload_dir['basedir'] . '/ai-photo-recreator/';
-        
-        // Create processed directory if it doesn't exist
-        if (!file_exists($ai_dir . 'processed/')) {
-            wp_mkdir_p($ai_dir . 'processed/');
-        }
-        
-        $file_info = pathinfo($file_path);
-        $processed_filename = 'processed_' . time() . '_' . $file_info['filename'] . '.' . $file_info['extension'];
-        $processed_path = $ai_dir . 'processed/' . $processed_filename;
-        
-        // Mock AI processing - for demonstration, we'll just copy the original file
-        // and add some text overlay to show it was "processed"
-        if ($this->create_mock_processed_image($file_path, $processed_path, $instructions)) {
-            $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
-            
-            return array(
-                'success' => true,
-                'processed_file' => $processed_path,
-                'processed_url' => $processed_url,
-                'download_url' => add_query_arg(array(
-                    'action' => 'ai_photo_download',
-                    'file' => urlencode($processed_filename),
-                    'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
-                ), admin_url('admin-ajax.php'))
-            );
-        } else {
+        // Check if GD extension is available
+        if (!extension_loaded('gd')) {
             return array(
                 'success' => false,
-                'message' => __('Failed to process image', 'ai-photo-recreator')
+                'message' => __('GD extension is required for image processing', 'ai-photo-recreator')
+            );
+        }
+        
+        try {
+            // In a real implementation, this would call an AI service like OpenAI DALL-E, Stable Diffusion, etc.
+            // For now, we'll create a mock processed version
+            
+            $upload_dir = wp_upload_dir();
+            $ai_dir = $upload_dir['basedir'] . '/ai-photo-recreator/';
+            
+            // Create processed directory if it doesn't exist
+            $processed_dir = $ai_dir . 'processed/';
+            if (!file_exists($processed_dir)) {
+                if (!wp_mkdir_p($processed_dir)) {
+                    return array(
+                        'success' => false,
+                        'message' => __('Failed to create processed directory', 'ai-photo-recreator')
+                    );
+                }
+            }
+            
+            // Check if original file exists
+            if (!file_exists($file_path)) {
+                return array(
+                    'success' => false,
+                    'message' => __('Original file not found', 'ai-photo-recreator')
+                );
+            }
+            
+            $file_info = pathinfo($file_path);
+            $processed_filename = 'processed_' . time() . '_' . $file_info['filename'] . '.' . $file_info['extension'];
+            $processed_path = $processed_dir . $processed_filename;
+            
+            // Mock AI processing - for demonstration, we'll just copy the original file
+            // and add some text overlay to show it was "processed"
+            if ($this->create_mock_processed_image($file_path, $processed_path, $instructions)) {
+                $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
+                
+                return array(
+                    'success' => true,
+                    'processed_file' => $processed_path,
+                    'processed_url' => $processed_url,
+                    'download_url' => add_query_arg(array(
+                        'action' => 'ai_photo_download',
+                        'file' => urlencode($processed_filename),
+                        'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
+                    ), admin_url('admin-ajax.php'))
+                );
+            } else {
+                return array(
+                    'success' => false,
+                    'message' => __('Failed to process image', 'ai-photo-recreator')
+                );
+            }
+        } catch (Exception $e) {
+            error_log('AI Photo Recreator Processing Error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => __('An error occurred during AI processing', 'ai-photo-recreator')
             );
         }
     }
@@ -182,6 +212,7 @@ class AI_Photo_Processor {
             // Get image info
             $image_info = getimagesize($original_path);
             if (!$image_info) {
+                error_log('AI Photo Recreator: Failed to get image info for ' . $original_path);
                 return false;
             }
             
@@ -190,21 +221,29 @@ class AI_Photo_Processor {
             $type = $image_info[2];
             
             // Create image resource based on type
+            $source = false;
             switch ($type) {
                 case IMAGETYPE_JPEG:
-                    $source = imagecreatefromjpeg($original_path);
+                    $source = @imagecreatefromjpeg($original_path);
                     break;
                 case IMAGETYPE_PNG:
-                    $source = imagecreatefrompng($original_path);
+                    $source = @imagecreatefrompng($original_path);
                     break;
                 case IMAGETYPE_WEBP:
-                    $source = imagecreatefromwebp($original_path);
+                    if (function_exists('imagecreatefromwebp')) {
+                        $source = @imagecreatefromwebp($original_path);
+                    } else {
+                        error_log('AI Photo Recreator: WebP support not available');
+                        return false;
+                    }
                     break;
                 default:
+                    error_log('AI Photo Recreator: Unsupported image type: ' . $type);
                     return false;
             }
             
             if (!$source) {
+                error_log('AI Photo Recreator: Failed to create image resource from ' . $original_path);
                 return false;
             }
             
@@ -212,8 +251,18 @@ class AI_Photo_Processor {
             $text_color = imagecolorallocate($source, 255, 255, 255);
             $bg_color = imagecolorallocate($source, 0, 0, 0);
             
+            if ($text_color === false || $bg_color === false) {
+                imagedestroy($source);
+                error_log('AI Photo Recreator: Failed to allocate colors');
+                return false;
+            }
+            
+            // Calculate overlay size based on image dimensions
+            $overlay_width = min(400, $width - 20);
+            $overlay_height = 60;
+            
             // Add background rectangle for text
-            imagefilledrectangle($source, 10, 10, 400, 60, $bg_color);
+            imagefilledrectangle($source, 10, 10, 10 + $overlay_width, 10 + $overlay_height, $bg_color);
             
             // Add text
             $text = __('AI Processed', 'ai-photo-recreator') . ': ' . substr($instructions, 0, 30) . '...';
@@ -224,22 +273,30 @@ class AI_Photo_Processor {
             $result = false;
             switch ($type) {
                 case IMAGETYPE_JPEG:
-                    $result = imagejpeg($source, $processed_path, 90);
+                    $result = @imagejpeg($source, $processed_path, 90);
                     break;
                 case IMAGETYPE_PNG:
-                    $result = imagepng($source, $processed_path, 9);
+                    $result = @imagepng($source, $processed_path, 6);
                     break;
                 case IMAGETYPE_WEBP:
-                    $result = imagewebp($source, $processed_path, 90);
+                    if (function_exists('imagewebp')) {
+                        $result = @imagewebp($source, $processed_path, 90);
+                    }
                     break;
             }
             
             // Clean up memory
             imagedestroy($source);
             
-            return $result;
+            if (!$result) {
+                error_log('AI Photo Recreator: Failed to save processed image to ' . $processed_path);
+                return false;
+            }
+            
+            return true;
             
         } catch (Exception $e) {
+            error_log('AI Photo Recreator: Exception in create_mock_processed_image: ' . $e->getMessage());
             return false;
         }
     }

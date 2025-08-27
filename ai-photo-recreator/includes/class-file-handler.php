@@ -112,21 +112,49 @@ class AI_Photo_File_Handler {
         try {
             // Get upload directory
             $upload_dir = wp_upload_dir();
+            
+            // Check if upload directory is writable
+            if (!$upload_dir || !empty($upload_dir['error'])) {
+                return array(
+                    'success' => false,
+                    'message' => __('Upload directory not available: ', 'ai-photo-recreator') . $upload_dir['error']
+                );
+            }
+            
             $ai_dir = $upload_dir['basedir'] . '/ai-photo-recreator/';
+            $original_dir = $ai_dir . 'original/';
             
             // Create directories if they don't exist
             if (!file_exists($ai_dir)) {
-                wp_mkdir_p($ai_dir);
+                if (!wp_mkdir_p($ai_dir)) {
+                    return array(
+                        'success' => false,
+                        'message' => __('Failed to create AI directory', 'ai-photo-recreator')
+                    );
+                }
             }
             
-            if (!file_exists($ai_dir . 'original/')) {
-                wp_mkdir_p($ai_dir . 'original/');
+            if (!file_exists($original_dir)) {
+                if (!wp_mkdir_p($original_dir)) {
+                    return array(
+                        'success' => false,
+                        'message' => __('Failed to create original directory', 'ai-photo-recreator')
+                    );
+                }
+            }
+            
+            // Check if directories are writable
+            if (!is_writable($original_dir)) {
+                return array(
+                    'success' => false,
+                    'message' => __('Original directory is not writable', 'ai-photo-recreator')
+                );
             }
             
             // Generate unique filename
-            $file_info = pathinfo($file['name']);
+            $file_info = pathinfo(sanitize_file_name($file['name']));
             $filename = 'original_' . time() . '_' . uniqid() . '.' . $file_info['extension'];
-            $file_path = $ai_dir . 'original/' . $filename;
+            $file_path = $original_dir . $filename;
             
             // Move uploaded file
             if (move_uploaded_file($file['tmp_name'], $file_path)) {
@@ -140,6 +168,8 @@ class AI_Photo_File_Handler {
                     'filename' => $filename
                 );
             } else {
+                $error_msg = error_get_last();
+                error_log('AI Photo Recreator: Failed to move uploaded file. Error: ' . print_r($error_msg, true));
                 return array(
                     'success' => false,
                     'message' => __('Failed to save uploaded file', 'ai-photo-recreator')
@@ -147,6 +177,7 @@ class AI_Photo_File_Handler {
             }
             
         } catch (Exception $e) {
+            error_log('AI Photo Recreator: Exception in save_uploaded_file: ' . $e->getMessage());
             return array(
                 'success' => false,
                 'message' => __('An error occurred while saving the file', 'ai-photo-recreator')

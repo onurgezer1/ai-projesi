@@ -57,20 +57,37 @@
                     hideProcessing($processBtn);
                     hideProgress();
                     
-                    if (response.success) {
+                    console.log('Response:', response); // Debug logging
+                    
+                    if (response.success && response.data) {
                         showResults(response.data);
                         // Reset form
                         $form[0].reset();
                         hideImagePreview();
                     } else {
-                        showError(response.data || aiPhotoRecreator.strings.error);
+                        // Handle both old format and new format responses
+                        const errorMessage = response.data ? 
+                            (typeof response.data === 'string' ? response.data : response.data.message) : 
+                            (response.message || aiPhotoRecreator.strings.error);
+                        showError(errorMessage);
                     }
                 },
                 error: function(xhr, status, error) {
                     hideProcessing($processBtn);
                     hideProgress();
-                    showError(aiPhotoRecreator.strings.error || 'An error occurred');
-                    console.error('Ajax error:', error);
+                    console.error('Ajax error:', error, xhr.responseText); // Enhanced debug logging
+                    
+                    // Try to parse error response
+                    let errorMessage = aiPhotoRecreator.strings.error || 'An error occurred';
+                    try {
+                        if (xhr.responseJSON && xhr.responseJSON.data) {
+                            errorMessage = xhr.responseJSON.data;
+                        }
+                    } catch (e) {
+                        // Use default error message
+                    }
+                    
+                    showError(errorMessage);
                 }
             });
         });

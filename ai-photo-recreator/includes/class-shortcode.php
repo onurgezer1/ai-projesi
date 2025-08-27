@@ -17,8 +17,7 @@ class AI_Photo_Recreator_Shortcode {
      */
     public function __construct() {
         add_shortcode('ai_photo_recreator', array($this, 'render_shortcode'));
-        add_action('wp_ajax_ai_photo_process', array($this, 'handle_ajax_process'));
-        add_action('wp_ajax_nopriv_ai_photo_process', array($this, 'handle_ajax_process'));
+        // Note: AJAX handlers are registered in main plugin file to avoid conflicts
         add_action('wp_ajax_ai_photo_download', array($this, 'handle_download'));
         add_action('wp_ajax_nopriv_ai_photo_download', array($this, 'handle_download'));
     }
@@ -156,36 +155,6 @@ class AI_Photo_Recreator_Shortcode {
         
         <?php
         return ob_get_clean();
-    }
-    
-    /**
-     * Handle AJAX photo processing
-     */
-    public function handle_ajax_process() {
-        // Security check
-        if (!wp_verify_nonce($_POST['nonce'], 'ai_photo_recreator_nonce')) {
-            wp_send_json_error(__('Security check failed', 'ai-photo-recreator'));
-        }
-        
-        // Check user capabilities
-        if (!current_user_can('upload_files')) {
-            wp_send_json_error(__('You do not have permission to upload files', 'ai-photo-recreator'));
-        }
-        
-        // Validate input
-        if (empty($_FILES['photo']) || empty($_POST['instructions'])) {
-            wp_send_json_error(__('Missing required fields', 'ai-photo-recreator'));
-        }
-        
-        // Process the photo
-        $processor = new AI_Photo_Processor();
-        $result = $processor->process_photo($_FILES['photo'], $_POST['instructions']);
-        
-        if ($result['success']) {
-            wp_send_json_success($result);
-        } else {
-            wp_send_json_error($result['message']);
-        }
     }
     
     /**

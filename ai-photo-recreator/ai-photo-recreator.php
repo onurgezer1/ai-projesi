@@ -113,12 +113,38 @@ class AI_Photo_Recreator {
      * Plugin activation
      */
     public function activate() {
-        // Create upload directory
+        // Check system requirements
+        if (!extension_loaded('gd')) {
+            deactivate_plugins(plugin_basename(__FILE__));
+            wp_die(__('AI Photo Recreator requires the GD extension to be installed. Please contact your hosting provider.', 'ai-photo-recreator'));
+        }
+        
+        if (version_compare(PHP_VERSION, '7.4', '<')) {
+            deactivate_plugins(plugin_basename(__FILE__));
+            wp_die(__('AI Photo Recreator requires PHP 7.4 or higher. Please contact your hosting provider.', 'ai-photo-recreator'));
+        }
+        
+        // Create upload directory structure
         $upload_dir = wp_upload_dir();
         $ai_dir = $upload_dir['basedir'] . '/ai-photo-recreator';
         
-        if (!file_exists($ai_dir)) {
-            wp_mkdir_p($ai_dir);
+        $directories = array(
+            $ai_dir,
+            $ai_dir . '/original',
+            $ai_dir . '/processed',
+            $ai_dir . '/temp'
+        );
+        
+        foreach ($directories as $dir) {
+            if (!file_exists($dir)) {
+                wp_mkdir_p($dir);
+                
+                // Add .htaccess for security (prevent direct access to originals)
+                if (strpos($dir, '/original') !== false) {
+                    $htaccess_content = "Options -Indexes\nDeny from all";
+                    file_put_contents($dir . '/.htaccess', $htaccess_content);
+                }
+            }
         }
         
         // Add default options
@@ -282,23 +308,58 @@ class AI_Photo_Recreator {
      * AJAX photo processing
      */
     public function ajax_process_photo() {
-        // Security check
-        if (!wp_verify_nonce($_POST['nonce'], 'ai_photo_recreator_nonce')) {
-            wp_die(__('Security check failed', 'ai-photo-recreator'));
+        try {
+            // Security check
+            if (!wp_verify_nonce($_POST['nonce'], 'ai_photo_recreator_nonce')) {
+                wp_send_json_error(__('Security check failed', 'ai-photo-recreator'));
+                return;
+            }
+            
+            // Check user capabilities
+            if (!current_user_can('upload_files')) {
+                wp_send_json_error(__('You do not have permission to upload files', 'ai-photo-recreator'));
+                return;
+            }
+            
+            // Validate input
+            if (empty($_FILES['photo'])) {
+                wp_send_json_error(__('No photo uploaded', 'ai-photo-recreator'));
+                return;
+            }
+            
+            if (empty($_POST['instructions'])) {
+                wp_send_json_error(__('No instructions provided', 'ai-photo-recreator'));
+                return;
+            }
+            
+            // Check if required classes exist
+            if (!class_exists('AI_Photo_Processor')) {
+                wp_send_json_error(__('AI Processor not available', 'ai-photo-recreator'));
+                return;
+            }
+            
+            if (!class_exists('AI_Photo_File_Handler')) {
+                wp_send_json_error(__('File Handler not available', 'ai-photo-recreator'));
+                return;
+            }
+            
+            // Process the photo
+            $processor = new AI_Photo_Processor();
+            $result = $processor->process_photo($_FILES['photo'], $_POST['instructions']);
+            
+            if ($result['success']) {
+                wp_send_json_success($result);
+            } else {
+                // Log the error for debugging
+                error_log('AI Photo Recreator Error: ' . $result['message']);
+                wp_send_json_error($result['message']);
+            }
+            
+        } catch (Exception $e) {
+            // Log the exception
+            error_log('AI Photo Recreator Exception: ' . $e->getMessage());
+            wp_send_json_error(__('An unexpected error occurred', 'ai-photo-recreator'));
         }
-        
-        // Check user capabilities
-        if (!current_user_can('upload_files')) {
-            wp_die(__('You do not have permission to upload files', 'ai-photo-recreator'));
-        }
-        
-        // Process the photo
-        $processor = new AI_Photo_Processor();
-        $file_handler = new AI_Photo_File_Handler();
-        
-        $result = $processor->process_photo($_FILES['photo'], $_POST['instructions']);
-        
-        wp_send_json($result);
     }
     
     /**
