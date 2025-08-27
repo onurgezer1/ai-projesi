@@ -335,7 +335,17 @@ class AI_Photo_Processor {
                         'content' => array(
                             array(
                                 'type' => 'text',
-                                'text' => 'Please analyze this image and provide a detailed description including: the main subject(s), their clothing, pose, facial expressions, setting/background, lighting, colors, mood, and any other important visual elements. Be very specific and detailed as this will be used to recreate a similar image with modifications.'
+                                'text' => 'Analyze this image in great detail for AI image recreation. Provide a comprehensive description structured as follows:
+
+SUBJECTS: Describe all people, their physical characteristics, clothing, poses, expressions, and positions
+SETTING: Detailed description of the location, environment, and background elements  
+LIGHTING: Type of lighting, direction, intensity, shadows, and overall mood
+COLORS: Dominant colors, color palette, and color temperature
+COMPOSITION: Camera angle, framing, depth of field, and photographic style
+ATMOSPHERE: Weather conditions, season, time of day, and environmental factors
+STYLE: Photography type (portrait, landscape, candid, etc.) and artistic qualities
+
+Be extremely specific and detailed as this will be used to recreate the exact scene with modifications.'
                             ),
                             array(
                                 'type' => 'image_url',
@@ -346,7 +356,7 @@ class AI_Photo_Processor {
                         )
                     )
                 ),
-                'max_tokens' => 500
+                'max_tokens' => 800
             );
             
             $args = array(
@@ -404,6 +414,119 @@ class AI_Photo_Processor {
     }
     
     /**
+     * Parse and understand user instructions for comprehensive transformations
+     * 
+     * @param string $instructions User instructions
+     * @return array Parsed transformation requirements
+     */
+    private function parse_transformation_instructions($instructions) {
+        $instructions = strtolower(trim($instructions));
+        $transformations = array();
+        
+        // Weather and environmental transformations
+        if (strpos($instructions, 'snow') !== false) {
+            $transformations['environment'] = 'winter';
+            $transformations['weather'] = 'snowy';
+            $transformations['background'] = 'snowy landscape with falling snow';
+            $transformations['atmosphere'] = 'cold, crisp winter atmosphere with overcast sky';
+            $transformations['lighting'] = 'soft, diffused winter lighting';
+            $transformations['effects'] = array('snow falling', 'frost on surfaces', 'winter clothing if appropriate');
+        }
+        
+        elseif (strpos($instructions, 'rain') !== false) {
+            $transformations['environment'] = 'rainy';
+            $transformations['weather'] = 'rainy';
+            $transformations['background'] = 'stormy, rainy environment';
+            $transformations['atmosphere'] = 'moody, overcast atmosphere with rain';
+            $transformations['lighting'] = 'dramatic, darker lighting with storm clouds';
+            $transformations['effects'] = array('rain drops falling', 'wet surfaces', 'puddles');
+        }
+        
+        elseif (strpos($instructions, 'sunset') !== false || strpos($instructions, 'golden hour') !== false) {
+            $transformations['environment'] = 'sunset';
+            $transformations['time'] = 'golden hour';
+            $transformations['background'] = 'beautiful sunset sky with warm colors';
+            $transformations['atmosphere'] = 'warm, romantic golden hour atmosphere';
+            $transformations['lighting'] = 'warm golden sunset lighting';
+            $transformations['effects'] = array('golden sun rays', 'warm color cast', 'dramatic sky');
+        }
+        
+        elseif (strpos($instructions, 'night') !== false || strpos($instructions, 'dark') !== false) {
+            $transformations['environment'] = 'night';
+            $transformations['time'] = 'nighttime';
+            $transformations['background'] = 'nighttime scene with appropriate lighting';
+            $transformations['atmosphere'] = 'mysterious nighttime atmosphere';
+            $transformations['lighting'] = 'dramatic night lighting with artificial light sources';
+            $transformations['effects'] = array('night sky', 'street lights or moon', 'night shadows');
+        }
+        
+        // Season transformations
+        elseif (strpos($instructions, 'autumn') !== false || strpos($instructions, 'fall') !== false) {
+            $transformations['environment'] = 'autumn';
+            $transformations['season'] = 'autumn';
+            $transformations['background'] = 'autumn landscape with fall colors';
+            $transformations['atmosphere'] = 'crisp autumn atmosphere';
+            $transformations['effects'] = array('colorful fall leaves', 'autumn foliage', 'warm autumn tones');
+        }
+        
+        elseif (strpos($instructions, 'spring') !== false) {
+            $transformations['environment'] = 'spring';
+            $transformations['season'] = 'spring';
+            $transformations['background'] = 'fresh spring environment with blooming flowers';
+            $transformations['atmosphere'] = 'fresh, vibrant spring atmosphere';
+            $transformations['effects'] = array('blooming flowers', 'fresh green leaves', 'spring colors');
+        }
+        
+        elseif (strpos($instructions, 'summer') !== false) {
+            $transformations['environment'] = 'summer';
+            $transformations['season'] = 'summer';
+            $transformations['background'] = 'bright summer scene';
+            $transformations['atmosphere'] = 'warm, bright summer atmosphere';
+            $transformations['lighting'] = 'bright summer sunlight';
+            $transformations['effects'] = array('bright sunshine', 'summer colors', 'clear blue sky');
+        }
+        
+        // Location transformations
+        if (strpos($instructions, 'beach') !== false || strpos($instructions, 'ocean') !== false) {
+            $transformations['location'] = 'beach';
+            $transformations['background'] = 'beautiful beach scene with ocean waves';
+        }
+        
+        elseif (strpos($instructions, 'forest') !== false || strpos($instructions, 'woods') !== false) {
+            $transformations['location'] = 'forest';
+            $transformations['background'] = 'dense forest environment with trees';
+        }
+        
+        elseif (strpos($instructions, 'mountain') !== false) {
+            $transformations['location'] = 'mountains';
+            $transformations['background'] = 'majestic mountain landscape';
+        }
+        
+        elseif (strpos($instructions, 'city') !== false || strpos($instructions, 'urban') !== false) {
+            $transformations['location'] = 'urban';
+            $transformations['background'] = 'urban cityscape with buildings';
+        }
+        
+        // Style transformations
+        if (strpos($instructions, 'vintage') !== false || strpos($instructions, 'retro') !== false) {
+            $transformations['style'] = 'vintage';
+            $transformations['effects'][] = 'vintage color grading and film aesthetic';
+        }
+        
+        elseif (strpos($instructions, 'dramatic') !== false) {
+            $transformations['style'] = 'dramatic';
+            $transformations['lighting'] = 'dramatic, high-contrast lighting';
+        }
+        
+        elseif (strpos($instructions, 'soft') !== false || strpos($instructions, 'dreamy') !== false) {
+            $transformations['style'] = 'soft';
+            $transformations['effects'][] = 'soft, dreamy lighting and atmosphere';
+        }
+        
+        return $transformations;
+    }
+
+    /**
      * Create comprehensive prompt for DALL-E based on image analysis and user instructions
      * 
      * @param string $image_description Description from Vision API
@@ -411,14 +534,51 @@ class AI_Photo_Processor {
      * @return string Comprehensive prompt for DALL-E
      */
     private function create_transformation_prompt($image_description, $user_instructions) {
-        $prompt = sprintf(
-            'Create a photorealistic image based on this description: %s. ' .
-            'Now apply these modifications while keeping the same composition, subjects, and overall scene: %s. ' .
-            'Maintain the same photographic style, lighting quality, and realism. ' .
-            'Make sure the requested changes are clearly visible and naturally integrated into the scene.',
-            $image_description,
-            sanitize_text_field($user_instructions)
-        );
+        // Parse instructions to understand what transformations are needed
+        $transformations = $this->parse_transformation_instructions($user_instructions);
+        
+        // Start with the base image description
+        $prompt = "Create a photorealistic image with the following base elements from the original: " . $image_description;
+        
+        // Apply comprehensive transformations
+        if (!empty($transformations)) {
+            $prompt .= "\n\nNow apply these comprehensive transformations:";
+            
+            // Environment and background changes
+            if (isset($transformations['background'])) {
+                $prompt .= "\n- BACKGROUND: Completely transform the background to: " . $transformations['background'];
+            }
+            
+            // Atmospheric changes
+            if (isset($transformations['atmosphere'])) {
+                $prompt .= "\n- ATMOSPHERE: Change the overall atmosphere to: " . $transformations['atmosphere'];
+            }
+            
+            // Lighting changes
+            if (isset($transformations['lighting'])) {
+                $prompt .= "\n- LIGHTING: Adjust lighting to: " . $transformations['lighting'];
+            }
+            
+            // Environmental effects
+            if (isset($transformations['weather'])) {
+                $prompt .= "\n- WEATHER: Add " . $transformations['weather'] . " weather conditions";
+            }
+            
+            // Visual effects
+            if (isset($transformations['effects']) && is_array($transformations['effects'])) {
+                $prompt .= "\n- EFFECTS: Include these visual elements: " . implode(', ', $transformations['effects']);
+            }
+            
+            // Style modifications
+            if (isset($transformations['style'])) {
+                $prompt .= "\n- STYLE: Apply " . $transformations['style'] . " photographic style";
+            }
+        } else {
+            // If no specific transformations detected, use original instructions
+            $prompt .= "\n\nApply these modifications while maintaining realism: " . sanitize_text_field($user_instructions);
+        }
+        
+        $prompt .= "\n\nIMPORTANT: Keep the same subjects, poses, and basic composition from the original image while applying these environmental and atmospheric transformations. Ensure all changes look natural and photorealistic. The transformation should be comprehensive and dramatically visible.";
         
         return $prompt;
     }
@@ -597,122 +757,280 @@ class AI_Photo_Processor {
     private function apply_instruction_based_processing($image_resource, $instructions, $width, $height) {
         $instructions = strtolower(trim($instructions));
         
-        // Snow effect
-        if (strpos($instructions, 'snow') !== false) {
-            $this->add_snow_effect($image_resource, $width, $height);
+        // Parse transformations to understand what's needed
+        $transformations = $this->parse_transformation_instructions($instructions);
+        
+        // Apply comprehensive transformations based on parsed instructions
+        if (isset($transformations['environment'])) {
+            switch ($transformations['environment']) {
+                case 'winter':
+                    $this->add_comprehensive_snow_effect($image_resource, $width, $height);
+                    break;
+                case 'rainy':
+                    $this->add_comprehensive_rain_effect($image_resource, $width, $height);
+                    break;
+                case 'sunset':
+                    $this->add_sunset_effect($image_resource);
+                    break;
+                case 'night':
+                    $this->add_night_effect($image_resource);
+                    break;
+                case 'autumn':
+                    $this->add_autumn_effect($image_resource);
+                    break;
+                case 'spring':
+                    $this->add_spring_effect($image_resource);
+                    break;
+                case 'summer':
+                    $this->add_summer_effect($image_resource);
+                    break;
+            }
         }
         
-        // Rain effect
+        // Legacy keyword-based processing for backward compatibility
+        elseif (strpos($instructions, 'snow') !== false) {
+            $this->add_comprehensive_snow_effect($image_resource, $width, $height);
+        }
         elseif (strpos($instructions, 'rain') !== false) {
-            $this->add_rain_effect($image_resource, $width, $height);
+            $this->add_comprehensive_rain_effect($image_resource, $width, $height);
         }
-        
-        // Vintage/sepia effect
         elseif (strpos($instructions, 'vintage') !== false || strpos($instructions, 'sepia') !== false) {
             $this->add_vintage_effect($image_resource);
         }
-        
-        // Black and white
         elseif (strpos($instructions, 'black and white') !== false || strpos($instructions, 'grayscale') !== false) {
             imagefilter($image_resource, IMG_FILTER_GRAYSCALE);
         }
-        
-        // Blur effect
         elseif (strpos($instructions, 'blur') !== false) {
             imagefilter($image_resource, IMG_FILTER_GAUSSIAN_BLUR);
         }
-        
-        // Bright/brighten
         elseif (strpos($instructions, 'bright') !== false || strpos($instructions, 'lighten') !== false) {
             imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 30);
         }
-        
-        // Dark/darken
         elseif (strpos($instructions, 'dark') !== false) {
             imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -30);
         }
-        
-        // Warm colors
         elseif (strpos($instructions, 'warm') !== false) {
             imagefilter($image_resource, IMG_FILTER_COLORIZE, 20, 0, -20);
         }
-        
-        // Cool colors
         elseif (strpos($instructions, 'cool') !== false) {
             imagefilter($image_resource, IMG_FILTER_COLORIZE, -20, 0, 20);
         }
-        
-        // Default: Apply subtle enhancement
         else {
+            // Default: Apply subtle enhancement
             imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 5);
             imagefilter($image_resource, IMG_FILTER_CONTRAST, -2);
         }
+        
+        // Apply style transformations
+        if (isset($transformations['style'])) {
+            switch ($transformations['style']) {
+                case 'vintage':
+                    $this->add_vintage_effect($image_resource);
+                    break;
+                case 'dramatic':
+                    imagefilter($image_resource, IMG_FILTER_CONTRAST, 15);
+                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -5);
+                    break;
+                case 'soft':
+                    imagefilter($image_resource, IMG_FILTER_SMOOTH, 2);
+                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 5);
+                    break;
+            }
+        }
     }
     
     /**
-     * Add snow effect to image
+     * Add comprehensive snow effect to image (enhanced winter transformation)
      */
-    private function add_snow_effect($image_resource, $width, $height) {
-        // Create semi-transparent white overlay for snow atmosphere
-        $snow_overlay = imagecreatetruecolor($width, $height);
-        $transparent = imagecolorallocatealpha($snow_overlay, 0, 0, 0, 127);
-        imagefill($snow_overlay, 0, 0, $transparent);
-        imagesavealpha($snow_overlay, true);
+    private function add_comprehensive_snow_effect($image_resource, $width, $height) {
+        // Step 1: Create winter atmosphere with cooler colors
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -15, -10, 15); // Cool blue tint
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 15); // Brighter for snow reflection
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, -5); // Softer contrast for overcast sky
         
-        $white = imagecolorallocatealpha($snow_overlay, 255, 255, 255, 100);
-        $light_white = imagecolorallocatealpha($snow_overlay, 255, 255, 255, 120);
+        // Step 2: Create multiple snow layers for realism
+        $snow_layers = array();
         
-        // Add random snowflakes
-        for ($i = 0; $i < 200; $i++) {
+        // Heavy snow overlay
+        $heavy_snow = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($heavy_snow, 0, 0, 0, 127);
+        imagefill($heavy_snow, 0, 0, $transparent);
+        imagesavealpha($heavy_snow, true);
+        
+        $white = imagecolorallocatealpha($heavy_snow, 255, 255, 255, 90);
+        $light_white = imagecolorallocatealpha($heavy_snow, 240, 245, 255, 100);
+        $very_light = imagecolorallocatealpha($heavy_snow, 255, 255, 255, 115);
+        
+        // Add various sizes of snowflakes for depth
+        for ($i = 0; $i < 300; $i++) {
             $x = rand(0, $width);
             $y = rand(0, $height);
-            $size = rand(1, 4);
-            $color = (rand(0, 1)) ? $white : $light_white;
+            $size = rand(1, 6);
+            $alpha_variation = rand(80, 120);
             
-            imagefilledellipse($snow_overlay, $x, $y, $size, $size, $color);
+            if ($size <= 2) {
+                $color = imagecolorallocatealpha($heavy_snow, 255, 255, 255, $alpha_variation);
+                imagefilledellipse($heavy_snow, $x, $y, $size, $size, $color);
+            } elseif ($size <= 4) {
+                $color = imagecolorallocatealpha($heavy_snow, 240, 245, 255, $alpha_variation);
+                imagefilledellipse($heavy_snow, $x, $y, $size, $size + 1, $color);
+            } else {
+                $color = imagecolorallocatealpha($heavy_snow, 255, 255, 255, $alpha_variation - 20);
+                imagefilledellipse($heavy_snow, $x, $y, $size, $size + 2, $color);
+            }
         }
         
-        // Apply cool color filter to simulate winter atmosphere
-        imagefilter($image_resource, IMG_FILTER_COLORIZE, -10, -5, 10);
-        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+        // Light snow background layer
+        $light_snow = imagecreatetruecolor($width, $height);
+        imagefill($light_snow, 0, 0, $transparent);
+        imagesavealpha($light_snow, true);
         
-        // Merge snow overlay
+        for ($i = 0; $i < 150; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $size = rand(1, 3);
+            $color = imagecolorallocatealpha($light_snow, 255, 255, 255, 120);
+            imagefilledellipse($light_snow, $x, $y, $size, $size, $color);
+        }
+        
+        // Step 3: Add ground snow effect (bottom portion)
+        $ground_height = $height / 3; // Bottom third of image
+        $ground_snow = imagecreatetruecolor($width, $ground_height);
+        $snow_ground = imagecolorallocatealpha($ground_snow, 250, 250, 255, 50);
+        imagefill($ground_snow, 0, 0, $snow_ground);
+        
+        // Step 4: Apply all snow layers
         imagealphablending($image_resource, true);
-        imagecopymerge($image_resource, $snow_overlay, 0, 0, 0, 0, $width, $height, 70);
         
-        imagedestroy($snow_overlay);
+        // Apply light snow first (background)
+        imagecopymerge($image_resource, $light_snow, 0, 0, 0, 0, $width, $height, 40);
+        
+        // Apply ground snow
+        imagecopymerge($image_resource, $ground_snow, 0, $height - $ground_height, 0, 0, $width, $ground_height, 30);
+        
+        // Apply heavy snow last (foreground)
+        imagecopymerge($image_resource, $heavy_snow, 0, 0, 0, 0, $width, $height, 80);
+        
+        // Clean up
+        imagedestroy($heavy_snow);
+        imagedestroy($light_snow);
+        imagedestroy($ground_snow);
     }
-    
+
     /**
-     * Add rain effect to image
+     * Add comprehensive rain effect to image
      */
-    private function add_rain_effect($image_resource, $width, $height) {
-        // Create rain overlay
+    private function add_comprehensive_rain_effect($image_resource, $width, $height) {
+        // Create stormy atmosphere
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -20);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 10);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -10, -10, 5);
+        
+        // Create rain overlay with multiple intensities
         $rain_overlay = imagecreatetruecolor($width, $height);
         $transparent = imagecolorallocatealpha($rain_overlay, 0, 0, 0, 127);
         imagefill($rain_overlay, 0, 0, $transparent);
         imagesavealpha($rain_overlay, true);
         
-        $rain_color = imagecolorallocatealpha($rain_overlay, 200, 200, 255, 110);
+        $rain_light = imagecolorallocatealpha($rain_overlay, 180, 190, 220, 110);
+        $rain_medium = imagecolorallocatealpha($rain_overlay, 160, 170, 200, 100);
+        $rain_heavy = imagecolorallocatealpha($rain_overlay, 200, 210, 240, 90);
         
-        // Add rain lines
+        // Heavy rain lines (foreground)
+        for ($i = 0; $i < 200; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $length = rand(15, 30);
+            $thickness = rand(1, 2);
+            
+            imagesetthickness($rain_overlay, $thickness);
+            imageline($rain_overlay, $x, $y, $x - 3, $y + $length, $rain_heavy);
+        }
+        
+        // Medium rain lines
+        for ($i = 0; $i < 300; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $length = rand(10, 20);
+            
+            imageline($rain_overlay, $x, $y, $x - 2, $y + $length, $rain_medium);
+        }
+        
+        // Light rain lines (background)
         for ($i = 0; $i < 150; $i++) {
             $x = rand(0, $width);
             $y = rand(0, $height);
-            $length = rand(10, 25);
+            $length = rand(5, 15);
             
-            imageline($rain_overlay, $x, $y, $x - 2, $y + $length, $rain_color);
+            imageline($rain_overlay, $x, $y, $x - 1, $y + $length, $rain_light);
         }
         
-        // Apply cool, darker atmosphere
-        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -15);
-        imagefilter($image_resource, IMG_FILTER_COLORIZE, -5, -5, 5);
+        // Add atmospheric mist at bottom
+        $mist_height = $height / 4;
+        for ($y = $height - $mist_height; $y < $height; $y++) {
+            for ($x = 0; $x < $width; $x += 3) {
+                if (rand(0, 10) > 7) {
+                    $alpha = 120 + rand(0, 7);
+                    $mist_color = imagecolorallocatealpha($rain_overlay, 200, 210, 220, $alpha);
+                    imagesetpixel($rain_overlay, $x, $y, $mist_color);
+                }
+            }
+        }
         
-        // Merge rain overlay
+        // Apply rain overlay
         imagealphablending($image_resource, true);
-        imagecopymerge($image_resource, $rain_overlay, 0, 0, 0, 0, $width, $height, 60);
+        imagecopymerge($image_resource, $rain_overlay, 0, 0, 0, 0, $width, $height, 75);
         
         imagedestroy($rain_overlay);
+    }
+
+    /**
+     * Add sunset/golden hour effect
+     */
+    private function add_sunset_effect($image_resource) {
+        // Warm golden tones
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, 40, 20, -30);
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 5);
+    }
+
+    /**
+     * Add night effect
+     */
+    private function add_night_effect($image_resource) {
+        // Dark, cool atmosphere
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -35);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -15, -10, 20);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 15);
+    }
+
+    /**
+     * Add autumn effect
+     */
+    private function add_autumn_effect($image_resource) {
+        // Warm autumn colors
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, 30, 10, -20);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 5);
+    }
+
+    /**
+     * Add spring effect
+     */
+    private function add_spring_effect($image_resource) {
+        // Fresh, vibrant colors
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -5, 15, -10);
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 8);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 3);
+    }
+
+    /**
+     * Add summer effect
+     */
+    private function add_summer_effect($image_resource) {
+        // Bright, warm summer tones
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 15);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, 15, 5, -15);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 8);
     }
     
     /**
