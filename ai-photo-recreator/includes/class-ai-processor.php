@@ -162,10 +162,10 @@ class AI_Photo_Processor {
             $processed_filename = 'processed_' . time() . '_' . $file_info['filename'] . '.' . $file_info['extension'];
             $processed_path = $processed_dir . $processed_filename;
             
-            // If no API key is provided, fall back to mock processing
+            // If no API key is provided, fall back to enhanced processing
             if (empty($api_key)) {
-                error_log('AI Photo Recreator: No API key configured, using fallback processing');
-                if ($this->create_mock_processed_image($file_path, $processed_path, $instructions)) {
+                error_log('AI Photo Recreator: No API key configured, using enhanced fallback processing');
+                if ($this->create_enhanced_fallback($file_path, $processed_path, $instructions)) {
                     $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
                     
                     return array(
@@ -177,7 +177,7 @@ class AI_Photo_Processor {
                             'file' => urlencode($processed_filename),
                             'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
                         ), admin_url('admin-ajax.php')),
-                        'message' => __('Note: Using fallback processing. Configure OpenAI API key in settings for real AI transformations.', 'ai-photo-recreator')
+                        'message' => __('Configure OpenAI API key in settings for real AI transformations. Using enhanced fallback processing.', 'ai-photo-recreator')
                     );
                 } else {
                     return array(
@@ -212,10 +212,10 @@ class AI_Photo_Processor {
                     );
                 }
             } else {
-                // AI processing failed, fall back to mock processing
-                error_log('AI Photo Recreator: OpenAI processing failed, falling back to mock: ' . $ai_result['message']);
+                // AI processing failed, fall back to enhanced processing
+                error_log('AI Photo Recreator: OpenAI processing failed, falling back to enhanced processing: ' . $ai_result['message']);
                 
-                if ($this->create_mock_processed_image($file_path, $processed_path, $instructions)) {
+                if ($this->create_enhanced_fallback($file_path, $processed_path, $instructions)) {
                     $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
                     
                     return array(
@@ -227,7 +227,7 @@ class AI_Photo_Processor {
                             'file' => urlencode($processed_filename),
                             'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
                         ), admin_url('admin-ajax.php')),
-                        'message' => sprintf(__('AI processing failed (%s). Using fallback processing.', 'ai-photo-recreator'), $ai_result['message'])
+                        'message' => sprintf(__('AI processing failed (%s). Using enhanced fallback processing.', 'ai-photo-recreator'), $ai_result['message'])
                     );
                 } else {
                     return array(
@@ -247,7 +247,7 @@ class AI_Photo_Processor {
     }
     
     /**
-     * Process image with OpenAI DALL-E
+     * Process image with OpenAI - Vision + DALL-E pipeline
      * 
      * @param string $file_path Original file path
      * @param string $instructions User instructions
@@ -256,7 +256,7 @@ class AI_Photo_Processor {
      */
     private function process_with_openai($file_path, $instructions, $api_key) {
         try {
-            // Prepare the image for OpenAI
+            // Step 1: Read and prepare the image
             $image_data = file_get_contents($file_path);
             if (!$image_data) {
                 return array(
@@ -270,24 +270,34 @@ class AI_Photo_Processor {
             $image_info = getimagesize($file_path);
             $mime_type = $image_info['mime'];
             
-            // Prepare the prompt for DALL-E
-            $prompt = sprintf(
-                'Transform this image according to these instructions: %s. Keep the main subject and composition but apply the requested changes.',
-                sanitize_text_field($instructions)
-            );
+            // Step 2: Analyze the image using GPT-4V to understand its content
+            $vision_result = $this->analyze_image_with_vision($base64_image, $api_key, $mime_type);
             
-            // OpenAI API call for image editing
-            $response = $this->call_openai_api($base64_image, $prompt, $api_key, $mime_type);
+            if (!$vision_result['success']) {
+                error_log('AI Photo Recreator: Vision analysis failed: ' . $vision_result['message']);
+                return array(
+                    'success' => false,
+                    'message' => sprintf(__('Image analysis failed: %s', 'ai-photo-recreator'), $vision_result['message'])
+                );
+            }
             
-            if ($response['success']) {
+            // Step 3: Create comprehensive prompt for DALL-E
+            $comprehensive_prompt = $this->create_transformation_prompt($vision_result['description'], $instructions);
+            
+            error_log('AI Photo Recreator: Generated DALL-E prompt: ' . $comprehensive_prompt);
+            
+            // Step 4: Generate new image with DALL-E
+            $dalle_result = $this->generate_image_with_dalle($comprehensive_prompt, $api_key);
+            
+            if ($dalle_result['success']) {
                 return array(
                     'success' => true,
-                    'image_data' => $response['image_data']
+                    'image_data' => $dalle_result['image_data']
                 );
             } else {
                 return array(
                     'success' => false,
-                    'message' => $response['message']
+                    'message' => $dalle_result['message']
                 );
             }
             
@@ -301,18 +311,16 @@ class AI_Photo_Processor {
     }
     
     /**
-     * Call OpenAI API for image processing
+     * Analyze image using GPT-4V to understand its content
      * 
      * @param string $base64_image Base64 encoded image
-     * @param string $prompt Processing prompt
      * @param string $api_key OpenAI API key
      * @param string $mime_type Image MIME type
-     * @return array API response
+     * @return array Analysis result
      */
-    private function call_openai_api($base64_image, $prompt, $api_key, $mime_type) {
+    private function analyze_image_with_vision($base64_image, $api_key, $mime_type) {
         try {
-            // Use OpenAI's image generation API
-            $api_url = 'https://api.openai.com/v1/images/generations';
+            $api_url = 'https://api.openai.com/v1/chat/completions';
             
             $headers = array(
                 'Authorization' => 'Bearer ' . $api_key,
@@ -320,11 +328,25 @@ class AI_Photo_Processor {
             );
             
             $body = array(
-                'model' => 'dall-e-3',
-                'prompt' => $prompt,
-                'n' => 1,
-                'size' => '1024x1024',
-                'response_format' => 'b64_json'
+                'model' => 'gpt-4-vision-preview',
+                'messages' => array(
+                    array(
+                        'role' => 'user',
+                        'content' => array(
+                            array(
+                                'type' => 'text',
+                                'text' => 'Please analyze this image and provide a detailed description including: the main subject(s), their clothing, pose, facial expressions, setting/background, lighting, colors, mood, and any other important visual elements. Be very specific and detailed as this will be used to recreate a similar image with modifications.'
+                            ),
+                            array(
+                                'type' => 'image_url',
+                                'image_url' => array(
+                                    'url' => 'data:' . $mime_type . ';base64,' . $base64_image
+                                )
+                            )
+                        )
+                    )
+                ),
+                'max_tokens' => 500
             );
             
             $args = array(
@@ -352,7 +374,106 @@ class AI_Photo_Processor {
                 
                 return array(
                     'success' => false,
-                    'message' => sprintf(__('OpenAI API error (%d): %s', 'ai-photo-recreator'), $response_code, $error_message)
+                    'message' => sprintf(__('Vision API error (%d): %s', 'ai-photo-recreator'), $response_code, $error_message)
+                );
+            }
+            
+            $data = json_decode($response_body, true);
+            
+            if (!isset($data['choices'][0]['message']['content'])) {
+                return array(
+                    'success' => false,
+                    'message' => __('Invalid response from Vision API', 'ai-photo-recreator')
+                );
+            }
+            
+            $description = $data['choices'][0]['message']['content'];
+            
+            return array(
+                'success' => true,
+                'description' => $description
+            );
+            
+        } catch (Exception $e) {
+            error_log('AI Photo Recreator Vision API Error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => __('Failed to analyze image with Vision API', 'ai-photo-recreator')
+            );
+        }
+    }
+    
+    /**
+     * Create comprehensive prompt for DALL-E based on image analysis and user instructions
+     * 
+     * @param string $image_description Description from Vision API
+     * @param string $user_instructions User's transformation instructions
+     * @return string Comprehensive prompt for DALL-E
+     */
+    private function create_transformation_prompt($image_description, $user_instructions) {
+        $prompt = sprintf(
+            'Create a photorealistic image based on this description: %s. ' .
+            'Now apply these modifications while keeping the same composition, subjects, and overall scene: %s. ' .
+            'Maintain the same photographic style, lighting quality, and realism. ' .
+            'Make sure the requested changes are clearly visible and naturally integrated into the scene.',
+            $image_description,
+            sanitize_text_field($user_instructions)
+        );
+        
+        return $prompt;
+    }
+    
+    /**
+     * Generate new image using DALL-E
+     * 
+     * @param string $prompt Comprehensive prompt for image generation
+     * @param string $api_key OpenAI API key
+     * @return array Generation result
+     */
+    private function generate_image_with_dalle($prompt, $api_key) {
+        try {
+            $api_url = 'https://api.openai.com/v1/images/generations';
+            
+            $headers = array(
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json'
+            );
+            
+            $body = array(
+                'model' => 'dall-e-3',
+                'prompt' => $prompt,
+                'n' => 1,
+                'size' => '1024x1024',
+                'response_format' => 'b64_json',
+                'quality' => 'standard'
+            );
+            
+            $args = array(
+                'timeout' => 120, // DALL-E can take longer
+                'headers' => $headers,
+                'body' => json_encode($body),
+                'method' => 'POST'
+            );
+            
+            $response = wp_remote_request($api_url, $args);
+            
+            if (is_wp_error($response)) {
+                return array(
+                    'success' => false,
+                    'message' => $response->get_error_message()
+                );
+            }
+            
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            
+            if ($response_code !== 200) {
+                $error_data = json_decode($response_body, true);
+                $error_message = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'Unknown API error';
+                
+                return array(
+                    'success' => false,
+                    'message' => sprintf(__('DALL-E API error (%d): %s', 'ai-photo-recreator'), $response_code, $error_message)
                 );
             }
             
@@ -361,7 +482,7 @@ class AI_Photo_Processor {
             if (!isset($data['data'][0]['b64_json'])) {
                 return array(
                     'success' => false,
-                    'message' => __('Invalid response from OpenAI API', 'ai-photo-recreator')
+                    'message' => __('Invalid response from DALL-E API', 'ai-photo-recreator')
                 );
             }
             
@@ -373,23 +494,24 @@ class AI_Photo_Processor {
             );
             
         } catch (Exception $e) {
-            error_log('AI Photo Recreator OpenAI API Error: ' . $e->getMessage());
+            error_log('AI Photo Recreator DALL-E API Error: ' . $e->getMessage());
             return array(
                 'success' => false,
-                'message' => __('Failed to call OpenAI API', 'ai-photo-recreator')
+                'message' => __('Failed to generate image with DALL-E', 'ai-photo-recreator')
             );
         }
     }
     
     /**
-     * Create mock processed image (fallback when no AI API is available)
+     * Create enhanced processed image (fallback when no AI API is available)
+     * Applies actual image processing based on user instructions
      * 
      * @param string $original_path Original image path
      * @param string $processed_path Processed image path
      * @param string $instructions User instructions
      * @return bool Success status
      */
-    private function create_mock_processed_image($original_path, $processed_path, $instructions) {
+    private function create_enhanced_fallback($original_path, $processed_path, $instructions) {
         try {
             // Get image info
             $image_info = getimagesize($original_path);
@@ -429,43 +551,8 @@ class AI_Photo_Processor {
                 return false;
             }
             
-            // Instead of just copying, we'll apply some basic visual modifications
-            // to show that processing occurred, though not real AI processing
-            
-            // Apply a subtle color filter to indicate "processing"
-            if (function_exists('imagefilter')) {
-                // Apply a subtle artistic effect
-                imagefilter($source, IMG_FILTER_BRIGHTNESS, 10);
-                imagefilter($source, IMG_FILTER_CONTRAST, -5);
-                imagefilter($source, IMG_FILTER_SMOOTH, 2);
-            }
-            
-            // Add a small watermark to indicate this is fallback processing
-            $text_color = imagecolorallocatealpha($source, 255, 255, 255, 30);
-            $bg_color = imagecolorallocatealpha($source, 0, 0, 0, 70);
-            
-            if ($text_color !== false && $bg_color !== false) {
-                // Add a small notice at the bottom right
-                $notice_text = __('Fallback Processing', 'ai-photo-recreator');
-                $text_box = imagettfbbox(8, 0, __FILE__, $notice_text);
-                if ($text_box === false) {
-                    // Fallback to imagestring if TTF not available
-                    $text_width = strlen($notice_text) * 8;
-                    $text_height = 12;
-                } else {
-                    $text_width = abs($text_box[4] - $text_box[0]);
-                    $text_height = abs($text_box[5] - $text_box[1]);
-                }
-                
-                $x = $width - $text_width - 15;
-                $y = $height - $text_height - 10;
-                
-                // Add semi-transparent background
-                imagefilledrectangle($source, $x - 5, $y - 15, $x + $text_width + 5, $y + 5, $bg_color);
-                
-                // Add text
-                imagestring($source, 2, $x, $y - 12, $notice_text, $text_color);
-            }
+            // Apply processing based on user instructions
+            $this->apply_instruction_based_processing($source, $instructions, $width, $height);
             
             // Save processed image
             $result = false;
@@ -494,9 +581,151 @@ class AI_Photo_Processor {
             return true;
             
         } catch (Exception $e) {
-            error_log('AI Photo Recreator: Exception in create_mock_processed_image: ' . $e->getMessage());
+            error_log('AI Photo Recreator: Exception in create_enhanced_fallback: ' . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Apply processing based on user instructions (enhanced fallback)
+     * 
+     * @param resource $image_resource GD image resource
+     * @param string $instructions User instructions
+     * @param int $width Image width
+     * @param int $height Image height
+     */
+    private function apply_instruction_based_processing($image_resource, $instructions, $width, $height) {
+        $instructions = strtolower(trim($instructions));
+        
+        // Snow effect
+        if (strpos($instructions, 'snow') !== false) {
+            $this->add_snow_effect($image_resource, $width, $height);
+        }
+        
+        // Rain effect
+        elseif (strpos($instructions, 'rain') !== false) {
+            $this->add_rain_effect($image_resource, $width, $height);
+        }
+        
+        // Vintage/sepia effect
+        elseif (strpos($instructions, 'vintage') !== false || strpos($instructions, 'sepia') !== false) {
+            $this->add_vintage_effect($image_resource);
+        }
+        
+        // Black and white
+        elseif (strpos($instructions, 'black and white') !== false || strpos($instructions, 'grayscale') !== false) {
+            imagefilter($image_resource, IMG_FILTER_GRAYSCALE);
+        }
+        
+        // Blur effect
+        elseif (strpos($instructions, 'blur') !== false) {
+            imagefilter($image_resource, IMG_FILTER_GAUSSIAN_BLUR);
+        }
+        
+        // Bright/brighten
+        elseif (strpos($instructions, 'bright') !== false || strpos($instructions, 'lighten') !== false) {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 30);
+        }
+        
+        // Dark/darken
+        elseif (strpos($instructions, 'dark') !== false) {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -30);
+        }
+        
+        // Warm colors
+        elseif (strpos($instructions, 'warm') !== false) {
+            imagefilter($image_resource, IMG_FILTER_COLORIZE, 20, 0, -20);
+        }
+        
+        // Cool colors
+        elseif (strpos($instructions, 'cool') !== false) {
+            imagefilter($image_resource, IMG_FILTER_COLORIZE, -20, 0, 20);
+        }
+        
+        // Default: Apply subtle enhancement
+        else {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 5);
+            imagefilter($image_resource, IMG_FILTER_CONTRAST, -2);
+        }
+    }
+    
+    /**
+     * Add snow effect to image
+     */
+    private function add_snow_effect($image_resource, $width, $height) {
+        // Create semi-transparent white overlay for snow atmosphere
+        $snow_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($snow_overlay, 0, 0, 0, 127);
+        imagefill($snow_overlay, 0, 0, $transparent);
+        imagesavealpha($snow_overlay, true);
+        
+        $white = imagecolorallocatealpha($snow_overlay, 255, 255, 255, 100);
+        $light_white = imagecolorallocatealpha($snow_overlay, 255, 255, 255, 120);
+        
+        // Add random snowflakes
+        for ($i = 0; $i < 200; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $size = rand(1, 4);
+            $color = (rand(0, 1)) ? $white : $light_white;
+            
+            imagefilledellipse($snow_overlay, $x, $y, $size, $size, $color);
+        }
+        
+        // Apply cool color filter to simulate winter atmosphere
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -10, -5, 10);
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+        
+        // Merge snow overlay
+        imagealphablending($image_resource, true);
+        imagecopymerge($image_resource, $snow_overlay, 0, 0, 0, 0, $width, $height, 70);
+        
+        imagedestroy($snow_overlay);
+    }
+    
+    /**
+     * Add rain effect to image
+     */
+    private function add_rain_effect($image_resource, $width, $height) {
+        // Create rain overlay
+        $rain_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($rain_overlay, 0, 0, 0, 127);
+        imagefill($rain_overlay, 0, 0, $transparent);
+        imagesavealpha($rain_overlay, true);
+        
+        $rain_color = imagecolorallocatealpha($rain_overlay, 200, 200, 255, 110);
+        
+        // Add rain lines
+        for ($i = 0; $i < 150; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $length = rand(10, 25);
+            
+            imageline($rain_overlay, $x, $y, $x - 2, $y + $length, $rain_color);
+        }
+        
+        // Apply cool, darker atmosphere
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -15);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -5, -5, 5);
+        
+        // Merge rain overlay
+        imagealphablending($image_resource, true);
+        imagecopymerge($image_resource, $rain_overlay, 0, 0, 0, 0, $width, $height, 60);
+        
+        imagedestroy($rain_overlay);
+    }
+    
+    /**
+     * Add vintage/sepia effect
+     */
+    private function add_vintage_effect($image_resource) {
+        // Apply sepia tone
+        imagefilter($image_resource, IMG_FILTER_GRAYSCALE);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, 90, 60, 40);
+        
+        // Reduce contrast slightly for vintage look
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, -10);
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -5);
     }
     
     /**
