@@ -61,6 +61,12 @@
                     
                     if (response.success && response.data) {
                         showResults(response.data);
+                        
+                        // Show message if there's a warning or info message
+                        if (response.data.message) {
+                            showInfoMessage(response.data.message);
+                        }
+                        
                         // Reset form
                         $form[0].reset();
                         hideImagePreview();
@@ -379,11 +385,43 @@
     }
     
     /**
+     * Show info message
+     */
+    function showInfoMessage(message) {
+        // Create info section if it doesn't exist
+        let $infoSection = $('#info-section');
+        if ($infoSection.length === 0) {
+            $infoSection = $('<div id="info-section" class="info-section" style="display:none; background:#e7f3ff; border:1px solid #b8daff; color:#0c5460; padding:15px; border-radius:4px; margin:20px 0;"><div class="info-message"></div><button type="button" class="close-info" style="background:none; border:none; float:right; cursor:pointer; margin-top:-5px;">×</button></div>');
+            $('#results-section').before($infoSection);
+        }
+        
+        $infoSection.find('.info-message').text(message);
+        $infoSection.hide().slideDown(300);
+        
+        // Auto-hide after 10 seconds
+        setTimeout(function() {
+            hideInfoMessage();
+        }, 10000);
+    }
+    
+    /**
+     * Hide info message
+     */
+    function hideInfoMessage() {
+        $('#info-section').slideUp(300);
+    }
+    
+    /**
      * Hide image preview
      */
     function hideImagePreview() {
         $('#image-preview').fadeOut(300);
     }
+    
+    // Add click handler for close info button
+    $(document).on('click', '.close-info', function() {
+        hideInfoMessage();
+    });
     
     /**
      * Add visual feedback for form interactions

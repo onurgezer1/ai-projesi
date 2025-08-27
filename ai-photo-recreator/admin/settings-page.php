@@ -167,17 +167,23 @@ $max_file_size_mb = $options['max_file_size'] / 1024 / 1024;
                 <table class="form-table">
                     <tr>
                         <th scope="row">
-                            <label for="api_key"><?php _e('API Key', 'ai-photo-recreator'); ?></label>
+                            <label for="api_key"><?php _e('OpenAI API Key', 'ai-photo-recreator'); ?></label>
                         </th>
                         <td>
                             <input type="password" id="api_key" name="api_key" 
                                    value="<?php echo esc_attr($options['api_key']); ?>" 
-                                   class="regular-text">
+                                   class="regular-text" placeholder="sk-...">
                             <button type="button" id="show-api-key" class="button button-secondary">
                                 <?php _e('Show', 'ai-photo-recreator'); ?>
                             </button>
                             <p class="description">
-                                <?php _e('API key for the AI service (e.g., OpenAI, Stable Diffusion, etc.). Leave empty to use mock processing.', 'ai-photo-recreator'); ?>
+                                <?php _e('OpenAI API key for DALL-E image generation. Get your API key from', 'ai-photo-recreator'); ?> 
+                                <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.<br>
+                                <?php if (empty($options['api_key'])): ?>
+                                    <span style="color: orange;">⚠ <?php _e('No API key configured. Plugin will use fallback processing (text overlay only).', 'ai-photo-recreator'); ?></span>
+                                <?php else: ?>
+                                    <span style="color: green;">✓ <?php _e('API key configured. Real AI transformations enabled.', 'ai-photo-recreator'); ?></span>
+                                <?php endif; ?>
                             </p>
                         </td>
                     </tr>
