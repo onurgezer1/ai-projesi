@@ -167,8 +167,13 @@ class AI_Photo_Processor {
             // If no API key is provided, use sophisticated local processing
             if (empty($api_key)) {
                 error_log('AI Photo Recreator: No API key configured, using sophisticated local processing');
-                if ($this->create_advanced_transformation($file_path, $processed_path, $instructions)) {
+                $local_result = $this->create_advanced_transformation($file_path, $processed_path, $instructions);
+                
+                if ($local_result['success']) {
                     $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
+                    
+                    // Create detailed user feedback message
+                    $user_feedback = $this->create_user_feedback_message($local_result['analysis_details'], $instructions);
                     
                     return array(
                         'success' => true,
@@ -179,12 +184,14 @@ class AI_Photo_Processor {
                             'file' => urlencode($processed_filename),
                             'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
                         ), admin_url('admin-ajax.php')),
-                        'message' => __('Photo transformed successfully! Configure OpenAI API key in settings for cloud-based AI processing.', 'ai-photo-recreator')
+                        'message' => $user_feedback,
+                        'analysis_details' => $local_result['analysis_details']
                     );
                 } else {
                     return array(
                         'success' => false,
-                        'message' => __('Failed to process image', 'ai-photo-recreator')
+                        'message' => $local_result['message'],
+                        'analysis_details' => $local_result['analysis_details']
                     );
                 }
             }
@@ -229,8 +236,13 @@ class AI_Photo_Processor {
                 if ($is_quota_issue) {
                     error_log('AI Photo Recreator: OpenAI quota exceeded, using sophisticated local processing: ' . $ai_result['message']);
                     
-                    if ($this->create_advanced_transformation($file_path, $processed_path, $instructions)) {
+                    $local_result = $this->create_advanced_transformation($file_path, $processed_path, $instructions);
+                    
+                    if ($local_result['success']) {
                         $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
+                        
+                        $user_feedback = $this->create_user_feedback_message($local_result['analysis_details'], $instructions);
+                        $quota_warning = '⚠️ OpenAI API quota exceeded. Check billing at platform.openai.com. ';
                         
                         return array(
                             'success' => true,
@@ -241,7 +253,8 @@ class AI_Photo_Processor {
                                 'file' => urlencode($processed_filename),
                                 'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
                             ), admin_url('admin-ajax.php')),
-                            'message' => __('⚠️ OpenAI API quota exceeded. Check your billing at platform.openai.com. Applied local advanced processing instead.', 'ai-photo-recreator')
+                            'message' => $quota_warning . $user_feedback,
+                            'analysis_details' => $local_result['analysis_details']
                         );
                     } else {
                         return array(
@@ -253,8 +266,12 @@ class AI_Photo_Processor {
                     // Other API errors - still try local processing
                     error_log('AI Photo Recreator: OpenAI processing failed, using sophisticated local processing: ' . $ai_result['message']);
                     
-                    if ($this->create_advanced_transformation($file_path, $processed_path, $instructions)) {
+                    $local_result = $this->create_advanced_transformation($file_path, $processed_path, $instructions);
+                    
+                    if ($local_result['success']) {
                         $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
+                        
+                        $user_feedback = $this->create_user_feedback_message($local_result['analysis_details'], $instructions);
                         
                         return array(
                             'success' => true,
@@ -265,7 +282,8 @@ class AI_Photo_Processor {
                                 'file' => urlencode($processed_filename),
                                 'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
                             ), admin_url('admin-ajax.php')),
-                            'message' => sprintf(__('OpenAI processing failed (%s). Applied local advanced processing. Check debug-openai-test.php for diagnostics.', 'ai-photo-recreator'), $ai_result['message'])
+                            'message' => sprintf(__('OpenAI unavailable (%s). Applied advanced local processing with comprehensive analysis. %s', 'ai-photo-recreator'), substr($ai_result['message'], 0, 50), $user_feedback),
+                            'analysis_details' => $local_result['analysis_details']
                         );
                     } else {
                         return array(
@@ -1777,7 +1795,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
      * @param string $original_path Original file path
      * @param string $processed_path Path where processed file will be saved
      * @param string $instructions User instructions
-     * @return bool Success status
+     * @return array Success status and analysis details
      */
     private function create_advanced_transformation($original_path, $processed_path, $instructions) {
         try {
@@ -1789,7 +1807,11 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             
             if (!$image_analysis['success']) {
                 error_log('AI Photo Recreator: Image analysis failed: ' . $image_analysis['message']);
-                return false;
+                return array(
+                    'success' => false,
+                    'message' => $image_analysis['message'],
+                    'analysis_details' => $image_analysis
+                );
             }
             
             error_log('AI Photo Recreator: Image analysis completed - Detected: ' . 
@@ -1812,7 +1834,11 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             $image_info = getimagesize($original_path);
             if (!$image_info) {
                 error_log('AI Photo Recreator: Failed to get image info for ' . $original_path);
-                return false;
+                return array(
+                    'success' => false,
+                    'message' => 'Failed to read image file',
+                    'analysis_details' => $image_analysis
+                );
             }
             
             $width = $image_info[0];
@@ -1833,17 +1859,29 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                         $source = @imagecreatefromwebp($original_path);
                     } else {
                         error_log('AI Photo Recreator: WebP support not available');
-                        return false;
+                        return array(
+                            'success' => false,
+                            'message' => 'WebP format not supported on this server',
+                            'analysis_details' => $image_analysis
+                        );
                     }
                     break;
                 default:
                     error_log('AI Photo Recreator: Unsupported image type: ' . $type);
-                    return false;
+                    return array(
+                        'success' => false,
+                        'message' => 'Unsupported image format',
+                        'analysis_details' => $image_analysis
+                    );
             }
             
             if (!$source) {
                 error_log('AI Photo Recreator: Failed to create image resource from ' . $original_path);
-                return false;
+                return array(
+                    'success' => false,
+                    'message' => 'Failed to process image file',
+                    'analysis_details' => $image_analysis
+                );
             }
             
             // Phase 5: Apply comprehensive intelligent transformations with image understanding
@@ -1871,15 +1909,32 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             
             if (!$result) {
                 error_log('AI Photo Recreator: Failed to save processed image to ' . $processed_path);
-                return false;
+                return array(
+                    'success' => false,
+                    'message' => 'Failed to save processed image',
+                    'analysis_details' => $image_analysis
+                );
             }
             
             error_log('AI Photo Recreator: Advanced transformation completed successfully with comprehensive image analysis');
-            return true;
+            return array(
+                'success' => true,
+                'message' => 'Photo transformed successfully with comprehensive AI analysis!',
+                'analysis_details' => array(
+                    'image_analysis' => $image_analysis,
+                    'transformations' => $transformations,
+                    'transformation_plan' => $transformation_plan,
+                    'user_feedback' => $transformation_plan['user_feedback'] ?? 'Transformation completed successfully'
+                )
+            );
             
         } catch (Exception $e) {
             error_log('AI Photo Recreator: Exception in create_advanced_transformation: ' . $e->getMessage());
-            return false;
+            return array(
+                'success' => false,
+                'message' => 'Processing error: ' . $e->getMessage(),
+                'analysis_details' => null
+            );
         }
     }
     
@@ -6245,5 +6300,53 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                 imagefilter($image_resource, IMG_FILTER_COLORIZE, 5, 0, -5);
             }
         }
+    }
+    
+    /**
+     * Create user-friendly feedback message about image analysis and processing
+     */
+    private function create_user_feedback_message($analysis_details, $instructions) {
+        if (!$analysis_details || !isset($analysis_details['image_analysis'])) {
+            return __('Photo transformed successfully! Configure OpenAI API key for enhanced AI processing.', 'ai-photo-recreator');
+        }
+        
+        $image_analysis = $analysis_details['image_analysis'];
+        $transformations = $analysis_details['transformations'] ?? array();
+        
+        $feedback_parts = array();
+        
+        // Analysis summary
+        $feedback_parts[] = sprintf(
+            '🔍 Analysis: Detected %d people and %d clothing areas in your photo.',
+            $image_analysis['people_count'] ?? 0,
+            $image_analysis['clothing_count'] ?? 0
+        );
+        
+        // Clothing-specific feedback
+        if (isset($transformations['transformation_type']) && $transformations['transformation_type'] === 'clothing_modification') {
+            $clothing_items = implode(', ', $transformations['target_clothing'] ?? array());
+            $colors = implode(', ', $transformations['target_colors'] ?? array());
+            
+            if (!empty($clothing_items) && !empty($colors)) {
+                $feedback_parts[] = sprintf(
+                    '🎯 Applied: Changed %s color to %s as requested.',
+                    $clothing_items,
+                    $colors
+                );
+            }
+        }
+        
+        // Dominant colors feedback
+        if (!empty($image_analysis['dominant_colors'])) {
+            $top_colors = array_slice($image_analysis['dominant_colors'], 0, 3);
+            $color_names = array_map(function($c) { return $c['color_name']; }, $top_colors);
+            $feedback_parts[] = '🎨 Original colors: ' . implode(', ', $color_names);
+        }
+        
+        // Processing type feedback
+        $feedback_parts[] = '⚡ Processing: Advanced local AI with comprehensive image understanding.';
+        $feedback_parts[] = '💡 Tip: Configure OpenAI API key in settings for even better cloud-based AI results!';
+        
+        return implode(' ', $feedback_parts);
     }
 }
