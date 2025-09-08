@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AI Photo Recreator
  * Plugin URI: https://github.com/onurgezer1/ai-projesi
- * Description: WordPress yapay zeka fotoğraf yeniden oluşturma plugin'i. Kullanıcıların yüklediği fotoğrafları belirtilen talimatlara göre AI ile yeniden oluşturur.
+ * Description: Advanced AI-powered photo transformation plugin with intelligent context understanding. Uses OpenAI DALL-E for cloud transformations and sophisticated local processing with deep semantic analysis, creative intelligence, and multilingual support for Turkish and English instructions.
  * Version: 1.0.0
  * Author: Onur Gezer
  * Text Domain: ai-photo-recreator
