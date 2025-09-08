@@ -1799,6 +1799,33 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
      */
     private function create_advanced_transformation($original_path, $processed_path, $instructions) {
         try {
+            // Validate GD extension and required constants
+            if (!extension_loaded('gd')) {
+                error_log('AI Photo Recreator: GD extension not loaded');
+                return array(
+                    'success' => false,
+                    'message' => 'GD extension is required for image processing',
+                    'analysis_details' => array()
+                );
+            }
+            
+            // Check for required GD constants
+            $required_constants = array(
+                'IMG_FILTER_BRIGHTNESS', 'IMG_FILTER_CONTRAST', 'IMG_FILTER_COLORIZE',
+                'IMG_FILTER_SMOOTH', 'IMG_FILTER_GRAYSCALE'
+            );
+            
+            foreach ($required_constants as $const) {
+                if (!defined($const)) {
+                    error_log('AI Photo Recreator: Missing GD constant: ' . $const);
+                    return array(
+                        'success' => false,
+                        'message' => 'GD extension missing required image filter constants',
+                        'analysis_details' => array()
+                    );
+                }
+            }
+            
             error_log('AI Photo Recreator: Starting advanced local transformation with comprehensive image analysis');
             
             // Phase 1: Comprehensive image analysis - Understand what's in the photo
@@ -2173,7 +2200,9 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             // Apply time-based variations
             if (isset($seeds['temporal_seed'])) {
                 $variation = intval(substr($seeds['temporal_seed'], -2));
-                imagefilter($image_resource, IMG_FILTER_HUE, ($variation % 20) - 10);
+                // Use colorize filter instead of non-existent HUE filter
+                $hue_value = ($variation % 20) - 10;
+                imagefilter($image_resource, IMG_FILTER_COLORIZE, $hue_value, 0, 0, 0);
             }
             
             // Apply content-based variations
@@ -5216,7 +5245,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     private function analyze_clothing_transformations($original, $lower) {
         $transformations = array();
         
-        // Turkish and English clothing items (with Turkish grammar variations)
+        // Enhanced Turkish and English clothing items with comprehensive grammar variations
         $clothing_items = array(
             'shirt' => array(
                 'shirt', 'gömlek', 'gömleğin', 'gömleğinin', 'gömleği', 'gömlekte', 'gömleğe', 'gömleğini',
@@ -5254,21 +5283,27 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         $detected_clothing = array();
         foreach ($clothing_items as $item => $variants) {
             foreach ($variants as $variant) {
-                if (strpos($lower, $variant) !== false) {
+                if (strpos($lower, strtolower($variant)) !== false) {
                     $detected_clothing[] = $item;
-                    break;
+                    error_log("AI Photo Recreator: Detected clothing item: {$item} (variant: {$variant})");
+                    break; // Found this item, move to next clothing type
                 }
             }
         }
         
         if (!empty($detected_clothing)) {
+            // Remove duplicates  
+            $detected_clothing = array_unique($detected_clothing);
             $transformations['target_clothing'] = $detected_clothing;
             $transformations['transformation_type'] = 'clothing_modification';
+            
+            error_log('AI Photo Recreator: All detected clothing: ' . implode(', ', $detected_clothing));
             
             // Detect specific clothing transformation actions
             $clothing_actions = $this->detect_clothing_actions($original, $lower);
             if (!empty($clothing_actions)) {
                 $transformations['clothing_actions'] = $clothing_actions;
+                error_log('AI Photo Recreator: Detected clothing actions: ' . implode(', ', $clothing_actions));
             }
         }
         
@@ -5310,35 +5345,58 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     private function analyze_color_transformations($original, $lower) {
         $transformations = array();
         
-        // Comprehensive color detection (Turkish and English with variations and quotes)
+        // Enhanced comprehensive color detection with better quote handling
         $colors = array(
-            'black' => array('black', 'siyah', 'kara', '"siyah"', '"black"', "'siyah'", "'black'"),
-            'white' => array('white', 'beyaz', 'ak', '"beyaz"', '"white"', "'beyaz'", "'white'"),
-            'red' => array('red', 'kırmızı', 'al', 'kızıl', '"kırmızı"', '"red"', "'kırmızı'", "'red'"),
-            'blue' => array('blue', 'mavi', 'lacivert', 'navy', 'gökyüzü mavisi', '"mavi"', '"blue"', "'mavi'", "'blue'"),
-            'green' => array('green', 'yeşil', 'yemyeşil', '"yeşil"', '"green"', "'yeşil'", "'green'"),
-            'yellow' => array('yellow', 'sarı', 'altın sarısı', '"sarı"', '"yellow"', "'sarı'", "'yellow'"),
-            'orange' => array('orange', 'turuncu', 'portakal rengi', '"turuncu"', '"orange"', "'turuncu'", "'orange'"),
-            'purple' => array('purple', 'mor', 'menekşe', 'eflatun', '"mor"', '"purple"', "'mor'", "'purple'"),
-            'pink' => array('pink', 'pembe', 'rozoz', 'pembemsi', '"pembe"', '"pink"', "'pembe'", "'pink'"),
-            'brown' => array('brown', 'kahverengi', 'kestane', 'kahve', '"kahverengi"', '"brown"', "'kahverengi'", "'brown'"),
-            'gray' => array('gray', 'grey', 'gri', 'külrengi', '"gri"', '"gray"', "'gri'", "'gray'"),
-            'gold' => array('gold', 'altın', 'sarı altın', 'altın rengi', '"altın"', '"gold"', "'altın'", "'gold'"),
-            'silver' => array('silver', 'gümüş', 'gri gümüş', 'gümüş rengi', '"gümüş"', '"silver"', "'gümüş'", "'silver'")
+            'black' => array('black', 'siyah', 'kara'),
+            'white' => array('white', 'beyaz', 'ak'),
+            'red' => array('red', 'kırmızı', 'al', 'kızıl'),
+            'blue' => array('blue', 'mavi', 'lacivert', 'navy', 'gökyüzü mavisi'),
+            'green' => array('green', 'yeşil', 'yemyeşil'),
+            'yellow' => array('yellow', 'sarı', 'altın sarısı'),
+            'orange' => array('orange', 'turuncu', 'portakal rengi'),
+            'purple' => array('purple', 'mor', 'menekşe', 'eflatun'),
+            'pink' => array('pink', 'pembe', 'rozoz', 'pembemsi'),
+            'brown' => array('brown', 'kahverengi', 'kestane', 'kahve'),
+            'gray' => array('gray', 'grey', 'gri', 'külrengi'),
+            'gold' => array('gold', 'altın', 'sarı altın', 'altın rengi'),
+            'silver' => array('silver', 'gümüş', 'gri gümüş', 'gümüş rengi')
         );
         
         $detected_colors = array();
+        
+        // First, check for quoted colors (higher priority)
         foreach ($colors as $color => $variants) {
             foreach ($variants as $variant) {
-                if (strpos($lower, $variant) !== false) {
+                // Check for colors in quotes
+                if (preg_match('/["\'"]' . preg_quote($variant, '/') . '["\'"]/', $original) ||
+                    preg_match('/["\'"]' . preg_quote(strtolower($variant), '/') . '["\'"]/', $lower)) {
                     $detected_colors[] = $color;
+                    error_log("AI Photo Recreator: Found quoted color: {$color} (variant: {$variant})");
+                    break; // Found this color, move to next color
+                }
+            }
+        }
+        
+        // If no quoted colors found, check for unquoted colors
+        if (empty($detected_colors)) {
+            foreach ($colors as $color => $variants) {
+                foreach ($variants as $variant) {
+                    if (strpos($lower, strtolower($variant)) !== false) {
+                        $detected_colors[] = $color;
+                        error_log("AI Photo Recreator: Found color: {$color} (variant: {$variant})");
+                        break; // Found this color, move to next color
+                    }
                 }
             }
         }
         
         if (!empty($detected_colors)) {
+            // Remove duplicates
+            $detected_colors = array_unique($detected_colors);
             $transformations['target_colors'] = $detected_colors;
             $transformations['color_transformation'] = true;
+            
+            error_log('AI Photo Recreator: Detected target colors: ' . implode(', ', $detected_colors));
             
             // Detect color intensity/shade
             $color_intensity = $this->analyze_color_intensity($original, $lower);
@@ -6082,28 +6140,69 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
             'execution_plan' => array()
         );
         
-        // Create specific transformation strategy based on analysis
+        error_log('AI Photo Recreator: Creating transformation plan - Type: ' . ($transformations['transformation_type'] ?? 'none'));
+        
+        // Enhanced clothing modification detection and planning
         if (isset($transformations['transformation_type']) && $transformations['transformation_type'] === 'clothing_modification') {
             $plan['transformation_strategy']['type'] = 'object_specific';
             $plan['transformation_strategy']['focus'] = 'clothing_color_change';
             
-            // Match detected clothing with requested changes
+            error_log('AI Photo Recreator: Detected clothing modification request');
+            error_log('AI Photo Recreator: Target clothing: ' . implode(', ', $transformations['target_clothing'] ?? array()));
+            error_log('AI Photo Recreator: Target colors: ' . implode(', ', $transformations['target_colors'] ?? array()));
+            
+            // Enhanced clothing area matching
+            $plan['execution_plan']['clothing_targets'] = array();
+            
             if (!empty($image_analysis['clothing_items']['detected_areas'])) {
-                $plan['execution_plan']['clothing_targets'] = array();
+                error_log('AI Photo Recreator: Found ' . count($image_analysis['clothing_items']['detected_areas']) . ' clothing areas');
                 
                 foreach ($image_analysis['clothing_items']['detected_areas'] as $clothing_area) {
-                    if ($clothing_area['type'] === 'shirt_area' && 
+                    error_log('AI Photo Recreator: Analyzing clothing area type: ' . $clothing_area['type']);
+                    
+                    // Match shirt/gömlek requests with shirt areas
+                    if (($clothing_area['type'] === 'shirt_area' || $clothing_area['type'] === 'torso_area') && 
                         isset($transformations['target_clothing']) && 
-                        in_array('shirt', $transformations['target_clothing'])) {
+                        (in_array('shirt', $transformations['target_clothing']) || 
+                         in_array('gömlek', $transformations['target_clothing']))) {
                         
                         $plan['execution_plan']['clothing_targets'][] = array(
                             'area' => $clothing_area['bounds'],
-                            'current_colors' => $clothing_area['dominant_colors'],
+                            'current_colors' => $clothing_area['dominant_colors'] ?? array(),
                             'target_colors' => $transformations['target_colors'] ?? array('black'),
-                            'transformation_type' => 'color_change'
+                            'transformation_type' => 'color_change',
+                            'clothing_type' => $clothing_area['type'],
+                            'confidence' => $clothing_area['confidence'] ?? 0.7
                         );
+                        
+                        error_log('AI Photo Recreator: Added clothing target for color change');
                     }
                 }
+            } else {
+                // Fallback: Create estimated shirt area based on image dimensions
+                error_log('AI Photo Recreator: No clothing areas detected, creating estimated shirt area');
+                
+                $image_width = $image_analysis['image_dimensions']['width'] ?? 800;
+                $image_height = $image_analysis['image_dimensions']['height'] ?? 600;
+                
+                // Estimate shirt area in center portion of image
+                $estimated_area = array(
+                    'x' => (int)($image_width * 0.3),
+                    'y' => (int)($image_height * 0.3),
+                    'width' => (int)($image_width * 0.4),
+                    'height' => (int)($image_height * 0.4)
+                );
+                
+                $plan['execution_plan']['clothing_targets'][] = array(
+                    'area' => $estimated_area,
+                    'current_colors' => array(),
+                    'target_colors' => $transformations['target_colors'] ?? array('black'),
+                    'transformation_type' => 'color_change',
+                    'clothing_type' => 'estimated_shirt_area',
+                    'confidence' => 0.5
+                );
+                
+                error_log('AI Photo Recreator: Added estimated clothing target');
             }
         }
         
@@ -6114,6 +6213,8 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         
         // Add user feedback message about what will be processed
         $plan['user_feedback'] = $this->generate_transformation_feedback($image_analysis, $transformations, $instructions);
+        
+        error_log('AI Photo Recreator: Transformation plan created with ' . count($plan['execution_plan']['clothing_targets'] ?? array()) . ' clothing targets');
         
         return $plan;
     }
@@ -6134,21 +6235,81 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         // Dominant colors found
         if (!empty($image_analysis['dominant_colors'])) {
             $top_colors = array_slice($image_analysis['dominant_colors'], 0, 3);
-            $color_names = array_map(function($c) { return $c['color_name']; }, $top_colors);
+            $color_names = array_map(function($c) { return $c['color_name'] ?? 'Unknown'; }, $top_colors);
             $feedback[] = "🎨 Dominant colors found: " . implode(', ', $color_names);
         }
         
-        // Transformation plan
+        // Enhanced transformation plan feedback
         if (isset($transformations['transformation_type']) && $transformations['transformation_type'] === 'clothing_modification') {
             $clothing_items = implode(', ', $transformations['target_clothing'] ?? array());
             $colors = implode(', ', $transformations['target_colors'] ?? array());
-            $feedback[] = "🎯 Plan: Will change {$clothing_items} color to {$colors}";
+            
+            $feedback[] = "🎯 Intelligent Plan: Will transform {$clothing_items} color to {$colors}";
+            
+            // Add detection details
+            if (!empty($transformations['target_clothing'])) {
+                $feedback[] = "👕 Detected Clothing: " . implode(', ', $transformations['target_clothing']);
+            }
+            
+            if (!empty($transformations['target_colors'])) {
+                $feedback[] = "🎨 Target Colors: " . implode(', ', $transformations['target_colors']);
+            }
+            
+            // Processing method
+            if ($image_analysis['people_count'] > 0) {
+                $feedback[] = "⚡ Processing: Using advanced people-aware clothing transformation";
+            } else {
+                $feedback[] = "⚡ Processing: Using estimated clothing area transformation";
+            }
+        } else {
+            // Non-clothing transformations
+            $intent = $transformations['primary_intent'] ?? 'general transformation';
+            $feedback[] = "🎯 Plan: Will apply {$intent} to the image";
         }
         
         // Original instruction
         $feedback[] = "📝 Your request: \"$instructions\"";
         
+        // Processing confidence
+        $overall_confidence = $this->calculate_overall_processing_confidence($image_analysis, $transformations);
+        if ($overall_confidence >= 0.8) {
+            $feedback[] = "✅ High confidence transformation expected";
+        } elseif ($overall_confidence >= 0.6) {
+            $feedback[] = "⚠️ Medium confidence transformation - may need refinement";
+        } else {
+            $feedback[] = "⚠️ Lower confidence - AI will apply best-effort transformation";
+        }
+        
         return implode("\n", $feedback);
+    }
+    
+    /**
+     * Calculate overall processing confidence
+     */
+    private function calculate_overall_processing_confidence($image_analysis, $transformations) {
+        $confidence = 0.0;
+        
+        // Image analysis confidence
+        if ($image_analysis['success']) {
+            $confidence += 0.3;
+        }
+        
+        // People detection confidence
+        if (($image_analysis['people_count'] ?? 0) > 0) {
+            $confidence += 0.2;
+        }
+        
+        // Clothing detection confidence
+        if (($image_analysis['clothing_count'] ?? 0) > 0) {
+            $confidence += 0.2;
+        }
+        
+        // Instruction parsing confidence
+        if (isset($transformations['transformation_type'])) {
+            $confidence += 0.3;
+        }
+        
+        return min(1.0, $confidence);
     }
     
     /**
@@ -6199,43 +6360,125 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         $target_rgb = $this->get_target_color_rgb($target_color);
         
         error_log("AI Photo Recreator: Transforming area ({$x_start},{$y_start}) to ({$x_end},{$y_end}) to color: {$target_color}");
+        error_log("AI Photo Recreator: Target RGB: R={$target_rgb['r']}, G={$target_rgb['g']}, B={$target_rgb['b']}");
         
-        // Create overlay for color transformation
-        $overlay = imagecreatetruecolor($x_end - $x_start, $y_end - $y_start);
-        imagesavealpha($overlay, true);
-        $transparent = imagecolorallocatealpha($overlay, 0, 0, 0, 127);
-        imagefill($overlay, 0, 0, $transparent);
+        $pixels_modified = 0;
+        $pixels_processed = 0;
         
-        // Apply color transformation with intelligent blending
+        // Apply color transformation with enhanced intelligent blending
         for ($y = $y_start; $y < $y_end; $y++) {
             for ($x = $x_start; $x < $x_end; $x++) {
+                $pixels_processed++;
+                
                 $current_rgb = imagecolorat($image_resource, $x, $y);
                 $current_colors = imagecolorsforindex($image_resource, $current_rgb);
                 
-                // Check if this pixel should be transformed (not skin tone, not background)
-                if (!$this->is_skin_tone($current_colors['red'], $current_colors['green'], $current_colors['blue'])) {
-                    // Calculate blend factor based on how "clothing-like" the pixel is
-                    $blend_factor = $this->calculate_clothing_blend_factor($current_colors, $area);
+                // Enhanced pixel filtering - skip skin tones and very bright/dark pixels
+                if (!$this->is_skin_tone($current_colors['red'], $current_colors['green'], $current_colors['blue']) &&
+                    !$this->is_background_pixel($current_colors) && 
+                    !$this->is_face_area($x, $y, $image_width, $image_height)) {
                     
-                    if ($blend_factor > 0.3) {
-                        // Apply color transformation
+                    // Calculate enhanced blend factor
+                    $blend_factor = $this->calculate_enhanced_clothing_blend_factor($current_colors, $x, $y, $area);
+                    
+                    if ($blend_factor > 0.2) {
+                        // Apply sophisticated color transformation
                         $new_r = (int)($target_rgb['r'] * $blend_factor + $current_colors['red'] * (1 - $blend_factor));
                         $new_g = (int)($target_rgb['g'] * $blend_factor + $current_colors['green'] * (1 - $blend_factor));
                         $new_b = (int)($target_rgb['b'] * $blend_factor + $current_colors['blue'] * (1 - $blend_factor));
                         
+                        // Ensure RGB values are within valid range
+                        $new_r = max(0, min(255, $new_r));
+                        $new_g = max(0, min(255, $new_g));
+                        $new_b = max(0, min(255, $new_b));
+                        
                         $new_color = imagecolorallocate($image_resource, $new_r, $new_g, $new_b);
-                        imagesetpixel($image_resource, $x, $y, $new_color);
+                        if ($new_color !== false) {
+                            imagesetpixel($image_resource, $x, $y, $new_color);
+                            $pixels_modified++;
+                        }
                     }
                 }
             }
         }
         
-        imagedestroy($overlay);
+        $modification_percentage = $pixels_processed > 0 ? ($pixels_modified / $pixels_processed) * 100 : 0;
+        error_log("AI Photo Recreator: Color transformation complete. Modified {$pixels_modified}/{$pixels_processed} pixels ({$modification_percentage}%)");
     }
     
     /**
-     * Get RGB values for target color name
+     * Enhanced clothing blend factor calculation
      */
+    private function calculate_enhanced_clothing_blend_factor($colors, $x, $y, $area) {
+        $r = $colors['red'];
+        $g = $colors['green'];  
+        $b = $colors['blue'];
+        
+        // Base blend factor
+        $blend_factor = 0.0;
+        
+        // Color analysis - typical clothing colors get higher blend factor
+        $brightness = ($r + $g + $b) / 3;
+        
+        // Medium brightness colors are more likely to be clothing
+        if ($brightness > 40 && $brightness < 220) {
+            $blend_factor += 0.4;
+        }
+        
+        // Colors that are not too saturated (skin tones are often saturated)
+        $max_rgb = max($r, $g, $b);
+        $min_rgb = min($r, $g, $b);
+        $saturation = $max_rgb > 0 ? ($max_rgb - $min_rgb) / $max_rgb : 0;
+        
+        if ($saturation < 0.6) {  // Less saturated = more likely clothing
+            $blend_factor += 0.3;
+        }
+        
+        // Position-based factor - center of area gets higher weight
+        $center_x = $area['x'] + $area['width'] / 2;
+        $center_y = $area['y'] + $area['height'] / 2;
+        
+        $distance_from_center = sqrt(pow($x - $center_x, 2) + pow($y - $center_y, 2));
+        $max_distance = sqrt(pow($area['width'] / 2, 2) + pow($area['height'] / 2, 2));
+        
+        if ($max_distance > 0) {
+            $center_factor = 1 - ($distance_from_center / $max_distance);
+            $blend_factor += $center_factor * 0.3;
+        }
+        
+        return min(1.0, max(0.0, $blend_factor));
+    }
+    
+    /**
+     * Check if pixel is likely background
+     */
+    private function is_background_pixel($colors) {
+        $r = $colors['red'];
+        $g = $colors['green'];
+        $b = $colors['blue'];
+        
+        // Very bright pixels (likely sky/background)
+        if ($r > 240 && $g > 240 && $b > 240) {
+            return true;
+        }
+        
+        // Very dark pixels (likely shadows/background)  
+        if ($r < 20 && $g < 20 && $b < 20) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Check if coordinate is likely face area
+     */
+    private function is_face_area($x, $y, $image_width, $image_height) {
+        // Simple heuristic - top 30% of image is more likely to be face area
+        $face_area_height = $image_height * 0.3;
+        
+        return $y < $face_area_height;
+    }
     private function get_target_color_rgb($color_name) {
         $colors = array(
             'black' => array('r' => 20, 'g' => 20, 'b' => 20),
