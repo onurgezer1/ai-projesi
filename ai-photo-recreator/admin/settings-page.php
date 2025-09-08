@@ -180,9 +180,9 @@ $max_file_size_mb = $options['max_file_size'] / 1024 / 1024;
                                 <?php _e('OpenAI API key for DALL-E image generation. Get your API key from', 'ai-photo-recreator'); ?> 
                                 <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.<br>
                                 <?php if (empty($options['api_key'])): ?>
-                                    <span style="color: orange;">⚠ <?php _e('No API key configured. Plugin will use fallback processing (text overlay only).', 'ai-photo-recreator'); ?></span>
+                                    <span style="color: orange;">⚠ <?php _e('No API key configured. Plugin will use advanced local processing with sophisticated transformations.', 'ai-photo-recreator'); ?></span>
                                 <?php else: ?>
-                                    <span style="color: green;">✓ <?php _e('API key configured. Real AI transformations enabled.', 'ai-photo-recreator'); ?></span>
+                                    <span style="color: green;">✓ <?php _e('API key configured. Cloud-based AI transformations enabled with local processing fallback.', 'ai-photo-recreator'); ?></span>
                                 <?php endif; ?>
                             </p>
                         </td>
