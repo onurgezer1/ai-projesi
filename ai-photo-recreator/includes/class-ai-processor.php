@@ -459,142 +459,573 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     }
     
     /**
-     * Parse and understand user instructions for comprehensive transformations
-     * Enhanced with Turkish language support and background replacement
+     * Advanced intelligent instruction parser with contextual understanding
+     * Supports varied instruction styles, compound commands, and intensity analysis
      * 
      * @param string $instructions User instructions
-     * @return array Parsed transformation requirements
+     * @return array Comprehensive transformation requirements
      */
     private function parse_transformation_instructions($instructions) {
-        $instructions = strtolower(trim($instructions));
+        $original_instructions = trim($instructions);
+        $instructions = strtolower($original_instructions);
         $transformations = array();
         
-        // Background removal detection (Turkish and English)
-        if (strpos($instructions, 'arka plan') !== false || strpos($instructions, 'background') !== false ||
-            strpos($instructions, 'arka planı kaldır') !== false || strpos($instructions, 'remove background') !== false ||
-            strpos($instructions, 'change background') !== false || strpos($instructions, 'arkaplan') !== false) {
-            $transformations['background_replace'] = true;
+        // Initialize instruction analysis
+        $transformations['original_text'] = $original_instructions;
+        $transformations['intensity'] = $this->analyze_instruction_intensity($instructions);
+        $transformations['action_verbs'] = $this->extract_action_verbs($instructions);
+        $transformations['descriptive_terms'] = $this->extract_descriptive_terms($instructions);
+        
+        // Advanced background detection (Turkish and English with more variations)
+        $background_patterns = array(
+            'arka plan', 'arkaplan', 'background', 'backdrop', 'sahne', 'scene',
+            'arka planı değiştir', 'arka planı kaldır', 'change background', 'remove background',
+            'replace background', 'new background', 'different background', 'background change',
+            'zemin', 'ground', 'setting', 'environment', 'çevre', 'ortam'
+        );
+        
+        foreach ($background_patterns as $pattern) {
+            if (strpos($instructions, $pattern) !== false) {
+                $transformations['background_replace'] = true;
+                break;
+            }
         }
         
-        // Weather and environmental transformations (with enhanced Turkish support)
-        if (strpos($instructions, 'snow') !== false || strpos($instructions, 'kar') !== false || 
-            strpos($instructions, 'kış') !== false || strpos($instructions, 'kar yağdır') !== false ||
-            strpos($instructions, 'kar yağ') !== false || strpos($instructions, 'karlı') !== false ||
-            strpos($instructions, 'winter') !== false || strpos($instructions, 'snowy') !== false) {
-            $transformations['environment'] = 'winter';
-            $transformations['weather'] = 'heavy snowfall';
-            $transformations['background'] = 'snow-covered winter landscape with falling snow and winter atmosphere';
-            $transformations['atmosphere'] = 'cold, crisp winter atmosphere with overcast snowy sky and visible snowfall';
-            $transformations['lighting'] = 'soft, diffused winter lighting typical of snowy weather';
-            $transformations['effects'] = array('heavy snow falling from the sky', 'snow accumulation on all surfaces', 'frost and ice effects', 'winter atmosphere', 'cold color temperature');
-            $transformations['comprehensive'] = true;
-            $transformations['background_replace'] = true;
+        // Advanced weather and environmental transformations with dynamic intensity
+        $weather_environments = $this->detect_weather_environments($instructions);
+        if (!empty($weather_environments)) {
+            $transformations = array_merge($transformations, $weather_environments);
         }
         
-        elseif (strpos($instructions, 'rain') !== false || strpos($instructions, 'yağmur') !== false ||
-                strpos($instructions, 'rainy') !== false || strpos($instructions, 'yağmurlu') !== false) {
-            $transformations['environment'] = 'rainy';
-            $transformations['weather'] = 'rainy';
-            $transformations['background'] = 'stormy, rainy environment with dark clouds';
-            $transformations['atmosphere'] = 'moody, overcast atmosphere with rain and storm clouds';
-            $transformations['lighting'] = 'dramatic, darker lighting with storm clouds';
-            $transformations['effects'] = array('rain drops falling', 'wet surfaces', 'puddles', 'storm clouds');
-            $transformations['background_replace'] = true;
+        // Advanced seasonal and location transformations
+        $seasonal_locations = $this->detect_seasonal_and_location_transforms($instructions);
+        if (!empty($seasonal_locations)) {
+            $transformations = array_merge($transformations, $seasonal_locations);
         }
         
-        elseif (strpos($instructions, 'sunset') !== false || strpos($instructions, 'golden hour') !== false ||
-                strpos($instructions, 'gün batımı') !== false || strpos($instructions, 'günbatımı') !== false ||
-                strpos($instructions, 'altın saat') !== false) {
-            $transformations['environment'] = 'sunset';
-            $transformations['time'] = 'golden hour';
-            $transformations['background'] = 'beautiful sunset sky with warm golden colors and dramatic clouds';
-            $transformations['atmosphere'] = 'warm, romantic golden hour atmosphere';
-            $transformations['lighting'] = 'warm golden sunset lighting';
-            $transformations['effects'] = array('golden sun rays', 'warm color cast', 'dramatic sunset sky', 'golden light');
+        // Advanced style transformations with context awareness
+        $style_transforms = $this->detect_style_transformations($instructions);
+        if (!empty($style_transforms)) {
+            $transformations = array_merge($transformations, $style_transforms);
         }
         
-        elseif (strpos($instructions, 'night') !== false || strpos($instructions, 'dark') !== false ||
-                strpos($instructions, 'gece') !== false || strpos($instructions, 'karanlık') !== false) {
-            $transformations['environment'] = 'night';
-            $transformations['time'] = 'nighttime';
-            $transformations['background'] = 'dramatic nighttime scene with stars or city lights';
-            $transformations['atmosphere'] = 'mysterious nighttime atmosphere';
-            $transformations['lighting'] = 'dramatic night lighting with artificial light sources or moonlight';
-            $transformations['effects'] = array('night sky', 'street lights or moon', 'night shadows', 'stars');
-            $transformations['background_replace'] = true;
+        // Compound instruction detection (multiple transformations)
+        $compound_transforms = $this->detect_compound_instructions($instructions);
+        if (!empty($compound_transforms)) {
+            $transformations = array_merge($transformations, $compound_transforms);
         }
         
-        // Season transformations (with Turkish support)
-        elseif (strpos($instructions, 'autumn') !== false || strpos($instructions, 'fall') !== false ||
-                strpos($instructions, 'sonbahar') !== false || strpos($instructions, 'güz') !== false) {
-            $transformations['environment'] = 'autumn';
-            $transformations['season'] = 'autumn';
-            $transformations['background'] = 'autumn landscape with colorful fall foliage and trees';
-            $transformations['atmosphere'] = 'crisp autumn atmosphere with falling leaves';
-            $transformations['effects'] = array('colorful fall leaves', 'autumn foliage', 'warm autumn tones', 'falling leaves');
-            $transformations['background_replace'] = true;
-        }
-        
-        elseif (strpos($instructions, 'spring') !== false || strpos($instructions, 'ilkbahar') !== false) {
-            $transformations['environment'] = 'spring';
-            $transformations['season'] = 'spring';
-            $transformations['background'] = 'fresh spring environment with blooming flowers and green trees';
-            $transformations['atmosphere'] = 'fresh, vibrant spring atmosphere';
-            $transformations['effects'] = array('blooming flowers', 'fresh green leaves', 'spring colors', 'cherry blossoms');
-            $transformations['background_replace'] = true;
-        }
-        
-        elseif (strpos($instructions, 'summer') !== false || strpos($instructions, 'yaz') !== false) {
-            $transformations['environment'] = 'summer';
-            $transformations['season'] = 'summer';
-            $transformations['background'] = 'bright summer scene with blue sky and sunshine';
-            $transformations['atmosphere'] = 'warm, bright summer atmosphere';
-            $transformations['lighting'] = 'bright summer sunlight';
-            $transformations['effects'] = array('bright sunshine', 'summer colors', 'clear blue sky');
-        }
-        
-        // Location transformations
-        if (strpos($instructions, 'beach') !== false || strpos($instructions, 'ocean') !== false) {
-            $transformations['location'] = 'beach';
-            $transformations['background'] = 'beautiful beach scene with ocean waves';
-        }
-        
-        elseif (strpos($instructions, 'forest') !== false || strpos($instructions, 'woods') !== false) {
-            $transformations['location'] = 'forest';
-            $transformations['background'] = 'dense forest environment with trees';
-        }
-        
-        elseif (strpos($instructions, 'mountain') !== false) {
-            $transformations['location'] = 'mountains';
-            $transformations['background'] = 'majestic mountain landscape';
-        }
-        
-        elseif (strpos($instructions, 'city') !== false || strpos($instructions, 'urban') !== false) {
-            $transformations['location'] = 'urban';
-            $transformations['background'] = 'urban cityscape with buildings';
-        }
-        
-        // Style transformations
-        if (strpos($instructions, 'vintage') !== false || strpos($instructions, 'retro') !== false) {
-            $transformations['style'] = 'vintage';
-            $transformations['effects'][] = 'vintage color grading and film aesthetic';
-        }
-        
-        elseif (strpos($instructions, 'dramatic') !== false) {
-            $transformations['style'] = 'dramatic';
-            $transformations['lighting'] = 'dramatic, high-contrast lighting';
-        }
-        
-        elseif (strpos($instructions, 'soft') !== false || strpos($instructions, 'dreamy') !== false) {
-            $transformations['style'] = 'soft';
-            $transformations['effects'][] = 'soft, dreamy lighting and atmosphere';
+        // Creative and abstract instruction handling
+        $creative_transforms = $this->handle_creative_instructions($instructions);
+        if (!empty($creative_transforms)) {
+            $transformations = array_merge($transformations, $creative_transforms);
         }
         
         return $transformations;
     }
+    
+    /**
+     * Analyze instruction intensity for graduated effects
+     */
+    private function analyze_instruction_intensity($instructions) {
+        $intensity_markers = array(
+            'extreme' => array('çok', 'very', 'extremely', 'intense', 'heavy', 'strong', 'dramatic', 'aşırı', 'yoğun', 'güçlü'),
+            'high' => array('quite', 'pretty', 'fairly', 'oldukça', 'epey', 'hayli'),
+            'medium' => array('normal', 'regular', 'standard', 'normal', 'düzenli', 'standart'),
+            'light' => array('light', 'gentle', 'soft', 'subtle', 'hafif', 'yumuşak', 'nazik', 'ince'),
+            'minimal' => array('slightly', 'barely', 'just', 'az', 'hafifçe', 'sadece', 'biraz')
+        );
+        
+        foreach ($intensity_markers as $level => $markers) {
+            foreach ($markers as $marker) {
+                if (strpos($instructions, $marker) !== false) {
+                    return $level;
+                }
+            }
+        }
+        
+        return 'medium'; // Default intensity
+    }
+    
+    /**
+     * Extract action verbs to understand what the user wants to do
+     */
+    private function extract_action_verbs($instructions) {
+        $action_verbs = array(
+            'add' => array('add', 'ekle', 'koy', 'place', 'put'),
+            'remove' => array('remove', 'kaldır', 'sil', 'delete', 'çıkar'),
+            'change' => array('change', 'değiştir', 'alter', 'modify', 'transform', 'dönüştür'),
+            'make' => array('make', 'yap', 'create', 'oluştur', 'generate'),
+            'turn' => array('turn', 'çevir', 'convert', 'dönüştür'),
+            'enhance' => array('enhance', 'improve', 'geliştir', 'iyileştir', 'better'),
+            'apply' => array('apply', 'uygula', 'kullan', 'use')
+        );
+        
+        $found_actions = array();
+        foreach ($action_verbs as $action => $verbs) {
+            foreach ($verbs as $verb) {
+                if (strpos($instructions, $verb) !== false) {
+                    $found_actions[] = $action;
+                    break;
+                }
+            }
+        }
+        
+        return array_unique($found_actions);
+    }
+    
+    /**
+     * Extract descriptive terms to understand the desired outcome
+     */
+    private function extract_descriptive_terms($instructions) {
+        $descriptive_terms = array(
+            'mood' => array('dramatic', 'soft', 'dreamy', 'romantic', 'mysterious', 'bright', 'dark', 'dramatik', 'yumuşak', 'rüya gibi'),
+            'color' => array('colorful', 'vibrant', 'muted', 'warm', 'cool', 'bright', 'dark', 'renkli', 'canlı', 'sıcak', 'soğuk'),
+            'weather' => array('stormy', 'sunny', 'cloudy', 'clear', 'foggy', 'misty', 'fırtınalı', 'güneşli', 'bulutlu', 'sisli'),
+            'time' => array('morning', 'noon', 'afternoon', 'evening', 'night', 'dawn', 'dusk', 'sabah', 'öğle', 'akşam', 'gece'),
+            'season' => array('seasonal', 'wintry', 'summery', 'springlike', 'autumnal', 'mevsimsel', 'kışlık', 'yazlık')
+        );
+        
+        $found_terms = array();
+        foreach ($descriptive_terms as $category => $terms) {
+            foreach ($terms as $term) {
+                if (strpos($instructions, $term) !== false) {
+                    if (!isset($found_terms[$category])) {
+                        $found_terms[$category] = array();
+                    }
+                    $found_terms[$category][] = $term;
+                }
+            }
+        }
+        
+        return $found_terms;
+    }
+    
+    /**
+     * Advanced weather environment detection with intensity and context
+     */
+    private function detect_weather_environments($instructions) {
+        $transformations = array();
+        
+        // Winter/Snow Detection with variations and intensity
+        $winter_patterns = array(
+            'snow' => array('patterns' => array('snow', 'kar', 'kış', 'winter', 'snowy', 'kar yağdır', 'kar yağ', 'karlı', 'kar tanesi', 'snowflake', 'buzlu', 'icy', 'don', 'frost'), 'intensity_boost' => false),
+            'blizzard' => array('patterns' => array('blizzard', 'kar fırtına', 'heavy snow', 'yoğun kar', 'kar kalın'), 'intensity_boost' => true)
+        );
+        
+        foreach ($winter_patterns as $type => $data) {
+            foreach ($data['patterns'] as $pattern) {
+                if (strpos($instructions, $pattern) !== false) {
+                    $intensity = $data['intensity_boost'] ? 'extreme' : 'high';
+                    $transformations = array_merge($transformations, $this->create_winter_transformation($intensity));
+                    break 2; // Exit both loops
+                }
+            }
+        }
+        
+        // Rain Detection with variations
+        $rain_patterns = array(
+            'light_rain' => array('patterns' => array('drizzle', 'light rain', 'hafif yağmur', 'çisenti'), 'intensity' => 'light'),
+            'rain' => array('patterns' => array('rain', 'yağmur', 'rainy', 'yağmurlu', 'wet', 'ıslak'), 'intensity' => 'medium'),
+            'storm' => array('patterns' => array('storm', 'thunder', 'heavy rain', 'fırtına', 'gök gürültü', 'yoğun yağmur'), 'intensity' => 'extreme')
+        );
+        
+        foreach ($rain_patterns as $type => $data) {
+            foreach ($data['patterns'] as $pattern) {
+                if (strpos($instructions, $pattern) !== false) {
+                    $transformations = array_merge($transformations, $this->create_rain_transformation($data['intensity']));
+                    break 2;
+                }
+            }
+        }
+        
+        // Sunset/Golden Hour Detection
+        $sunset_patterns = array('sunset', 'golden hour', 'gün batımı', 'günbatımı', 'altın saat', 'warm light', 'sıcak ışık');
+        foreach ($sunset_patterns as $pattern) {
+            if (strpos($instructions, $pattern) !== false) {
+                $transformations = array_merge($transformations, $this->create_sunset_transformation());
+                break;
+            }
+        }
+        
+        // Night Detection
+        $night_patterns = array('night', 'dark', 'gece', 'karanlık', 'nighttime', 'moonlight', 'ay ışığı', 'starry', 'yıldızlı');
+        foreach ($night_patterns as $pattern) {
+            if (strpos($instructions, $pattern) !== false) {
+                $transformations = array_merge($transformations, $this->create_night_transformation());
+                break;
+            }
+        }
+        
+        return $transformations;
+    }
+    
+    /**
+     * Create dynamic winter transformation based on intensity
+     */
+    private function create_winter_transformation($intensity = 'medium') {
+        $base_transform = array(
+            'environment' => 'winter',
+            'background_replace' => true,
+            'comprehensive' => true
+        );
+        
+        switch ($intensity) {
+            case 'extreme':
+                return array_merge($base_transform, array(
+                    'weather' => 'blizzard conditions with heavy snowfall',
+                    'background' => 'intense winter blizzard landscape with deep snow drifts and heavy snowfall',
+                    'atmosphere' => 'fierce winter storm atmosphere with whiteout conditions and intense snowfall',
+                    'lighting' => 'harsh, diffused blizzard lighting with limited visibility',
+                    'effects' => array('blizzard-level snowfall', 'snow drifts', 'whiteout conditions', 'ice crystals', 'extreme cold atmosphere', 'wind-blown snow'),
+                    'intensity_level' => 'extreme'
+                ));
+            case 'high':
+                return array_merge($base_transform, array(
+                    'weather' => 'heavy snowfall',
+                    'background' => 'snow-covered winter landscape with heavy falling snow and winter atmosphere',
+                    'atmosphere' => 'cold, crisp winter atmosphere with overcast snowy sky and visible heavy snowfall',
+                    'lighting' => 'soft, diffused winter lighting typical of heavy snow weather',
+                    'effects' => array('heavy snow falling from the sky', 'thick snow accumulation on all surfaces', 'frost and ice effects', 'winter atmosphere', 'cold color temperature'),
+                    'intensity_level' => 'high'
+                ));
+            case 'light':
+                return array_merge($base_transform, array(
+                    'weather' => 'light snowfall',
+                    'background' => 'gentle winter scene with light snow and winter ambiance',
+                    'atmosphere' => 'mild winter atmosphere with light overcast sky and gentle snowfall',
+                    'lighting' => 'soft winter lighting with gentle snow ambiance',
+                    'effects' => array('light snow falling', 'light snow dusting', 'gentle winter ambiance', 'cool color temperature'),
+                    'intensity_level' => 'light'
+                ));
+            default: // medium
+                return array_merge($base_transform, array(
+                    'weather' => 'moderate snowfall',
+                    'background' => 'winter landscape with moderate snow coverage and steady snowfall',
+                    'atmosphere' => 'crisp winter atmosphere with steady snowfall',
+                    'lighting' => 'diffused winter lighting',
+                    'effects' => array('steady snowfall', 'snow accumulation', 'winter atmosphere', 'cool tones'),
+                    'intensity_level' => 'medium'
+                ));
+        }
+    }
+    
+    /**
+     * Create dynamic rain transformation based on intensity  
+     */
+    private function create_rain_transformation($intensity = 'medium') {
+        $base_transform = array(
+            'environment' => 'rainy',
+            'background_replace' => true,
+            'comprehensive' => true
+        );
+        
+        switch ($intensity) {
+            case 'extreme':
+                return array_merge($base_transform, array(
+                    'weather' => 'thunderstorm with heavy rain',
+                    'background' => 'dramatic thunderstorm environment with dark storm clouds and lightning',
+                    'atmosphere' => 'intense storm atmosphere with thunder, lightning, and torrential rain',
+                    'lighting' => 'dramatic storm lighting with lightning flashes and dark clouds',
+                    'effects' => array('torrential rain', 'lightning', 'thunder clouds', 'flooding puddles', 'storm winds'),
+                    'intensity_level' => 'extreme'
+                ));
+            case 'light':
+                return array_merge($base_transform, array(
+                    'weather' => 'light drizzle',
+                    'background' => 'gentle overcast environment with light rain',
+                    'atmosphere' => 'soft, misty atmosphere with light drizzle',
+                    'lighting' => 'soft, diffused overcast lighting',
+                    'effects' => array('light drizzle', 'gentle mist', 'soft rain drops', 'light puddles'),
+                    'intensity_level' => 'light'
+                ));
+            default: // medium
+                return array_merge($base_transform, array(
+                    'weather' => 'steady rain',
+                    'background' => 'rainy environment with dark clouds and steady rainfall',
+                    'atmosphere' => 'moody, overcast atmosphere with steady rain',
+                    'lighting' => 'dramatic, darker lighting with storm clouds',
+                    'effects' => array('steady rain drops falling', 'wet surfaces', 'puddles', 'storm clouds'),
+                    'intensity_level' => 'medium'
+                ));
+        }
+    }
+    
+    /**
+     * Create sunset transformation
+     */
+    private function create_sunset_transformation() {
+        return array(
+            'environment' => 'sunset',
+            'time' => 'golden hour',
+            'background' => 'beautiful sunset sky with warm golden colors and dramatic clouds',
+            'atmosphere' => 'warm, romantic golden hour atmosphere',
+            'lighting' => 'warm golden sunset lighting',
+            'effects' => array('golden sun rays', 'warm color cast', 'dramatic sunset sky', 'golden light'),
+            'comprehensive' => true
+        );
+    }
+    
+    /**
+     * Create night transformation
+     */
+    private function create_night_transformation() {
+        return array(
+            'environment' => 'night',
+            'time' => 'nighttime',
+            'background' => 'dramatic nighttime scene with stars or city lights',
+            'atmosphere' => 'mysterious nighttime atmosphere',
+            'lighting' => 'dramatic night lighting with artificial light sources or moonlight',
+            'effects' => array('night sky', 'street lights or moon', 'night shadows', 'stars'),
+            'background_replace' => true,
+            'comprehensive' => true
+        );
+    }
+    
+    /**
+     * Detect seasonal and location transformations
+     */
+    private function detect_seasonal_and_location_transforms($instructions) {
+        $transformations = array();
+        
+        // Seasonal transformations with Turkish support
+        $seasonal_patterns = array(
+            'autumn' => array('autumn', 'fall', 'sonbahar', 'güz'),
+            'spring' => array('spring', 'ilkbahar'),
+            'summer' => array('summer', 'yaz')
+        );
+        
+        foreach ($seasonal_patterns as $season => $patterns) {
+            foreach ($patterns as $pattern) {
+                if (strpos($instructions, $pattern) !== false) {
+                    $transformations = array_merge($transformations, $this->create_seasonal_transformation($season));
+                    break 2;
+                }
+            }
+        }
+        
+        // Location transformations
+        $location_patterns = array(
+            'beach' => array('beach', 'ocean', 'sea', 'sahil', 'deniz', 'okyanuz'),
+            'forest' => array('forest', 'woods', 'trees', 'orman', 'ağaç'),
+            'mountain' => array('mountain', 'hill', 'dağ', 'tepe'),
+            'city' => array('city', 'urban', 'street', 'şehir', 'kent', 'sokak'),
+            'desert' => array('desert', 'sand', 'çöl', 'kum'),
+            'field' => array('field', 'meadow', 'grass', 'tarla', 'çayır', 'ot')
+        );
+        
+        foreach ($location_patterns as $location => $patterns) {
+            foreach ($patterns as $pattern) {
+                if (strpos($instructions, $pattern) !== false) {
+                    $transformations = array_merge($transformations, $this->create_location_transformation($location));
+                    break 2;
+                }
+            }
+        }
+        
+        return $transformations;
+    }
+    
+    /**
+     * Create seasonal transformations
+     */
+    private function create_seasonal_transformation($season) {
+        $seasonal_configs = array(
+            'autumn' => array(
+                'environment' => 'autumn',
+                'season' => 'autumn',
+                'background' => 'autumn landscape with colorful fall foliage and trees',
+                'atmosphere' => 'crisp autumn atmosphere with falling leaves',
+                'effects' => array('colorful fall leaves', 'autumn foliage', 'warm autumn tones', 'falling leaves'),
+                'background_replace' => true
+            ),
+            'spring' => array(
+                'environment' => 'spring',
+                'season' => 'spring',
+                'background' => 'fresh spring environment with blooming flowers and green trees',
+                'atmosphere' => 'fresh, vibrant spring atmosphere',
+                'effects' => array('blooming flowers', 'fresh green leaves', 'spring colors', 'cherry blossoms'),
+                'background_replace' => true
+            ),
+            'summer' => array(
+                'environment' => 'summer',
+                'season' => 'summer',
+                'background' => 'bright summer scene with blue sky and sunshine',
+                'atmosphere' => 'warm, bright summer atmosphere',
+                'lighting' => 'bright summer sunlight',
+                'effects' => array('bright sunshine', 'summer colors', 'clear blue sky')
+            )
+        );
+        
+        return isset($seasonal_configs[$season]) ? $seasonal_configs[$season] : array();
+    }
+    
+    /**
+     * Create location transformations
+     */
+    private function create_location_transformation($location) {
+        $location_configs = array(
+            'beach' => array(
+                'location' => 'beach',
+                'background' => 'beautiful beach scene with ocean waves and sand',
+                'atmosphere' => 'coastal atmosphere with sea breeze',
+                'effects' => array('ocean waves', 'sand', 'seagulls', 'coastal breeze'),
+                'background_replace' => true
+            ),
+            'forest' => array(
+                'location' => 'forest',
+                'background' => 'dense forest environment with tall trees and natural lighting',
+                'atmosphere' => 'forest atmosphere with dappled sunlight',
+                'effects' => array('tall trees', 'forest canopy', 'natural lighting', 'forest floor'),
+                'background_replace' => true
+            ),
+            'mountain' => array(
+                'location' => 'mountains',
+                'background' => 'majestic mountain landscape with peaks and valleys',
+                'atmosphere' => 'mountain atmosphere with clear air',
+                'effects' => array('mountain peaks', 'valleys', 'mountain air', 'scenic views'),
+                'background_replace' => true
+            ),
+            'city' => array(
+                'location' => 'urban',
+                'background' => 'urban cityscape with buildings and streets',
+                'atmosphere' => 'urban atmosphere with city energy',
+                'effects' => array('buildings', 'streets', 'urban lighting', 'city life')
+            ),
+            'desert' => array(
+                'location' => 'desert',
+                'background' => 'desert landscape with sand dunes and clear sky',
+                'atmosphere' => 'arid desert atmosphere',
+                'effects' => array('sand dunes', 'desert sky', 'arid climate', 'desert landscape'),
+                'background_replace' => true
+            ),
+            'field' => array(
+                'location' => 'field',
+                'background' => 'open field with grass and sky',
+                'atmosphere' => 'open field atmosphere with natural elements',
+                'effects' => array('grass field', 'open sky', 'natural environment'),
+                'background_replace' => true
+            )
+        );
+        
+        return isset($location_configs[$location]) ? $location_configs[$location] : array();
+    }
+    
+    /**
+     * Detect style transformations
+     */
+    private function detect_style_transformations($instructions) {
+        $transformations = array();
+        
+        $style_patterns = array(
+            'vintage' => array('vintage', 'retro', 'old', 'classic', 'nostalgic', 'eski', 'klasik', 'nostalji'),
+            'dramatic' => array('dramatic', 'intense', 'bold', 'striking', 'dramatik', 'yoğun', 'cesur'),
+            'soft' => array('soft', 'gentle', 'dreamy', 'ethereal', 'yumuşak', 'nazik', 'rüya gibi'),
+            'artistic' => array('artistic', 'creative', 'painterly', 'stylized', 'sanatsal', 'yaratıcı'),
+            'cinematic' => array('cinematic', 'movie', 'film', 'sinematik', 'film gibi'),
+            'bright' => array('bright', 'vivid', 'vibrant', 'colorful', 'parlak', 'canlı', 'renkli'),
+            'dark' => array('dark', 'moody', 'mysterious', 'gothic', 'karanlık', 'gizemli')
+        );
+        
+        foreach ($style_patterns as $style => $patterns) {
+            foreach ($patterns as $pattern) {
+                if (strpos($instructions, $pattern) !== false) {
+                    $transformations['style'] = $style;
+                    $transformations['style_effects'] = $this->get_style_effects($style);
+                    break 2;
+                }
+            }
+        }
+        
+        return $transformations;
+    }
+    
+    /**
+     * Get effects for specific styles
+     */
+    private function get_style_effects($style) {
+        $style_effects = array(
+            'vintage' => array('sepia tones', 'film grain', 'aged look', 'warm color cast'),
+            'dramatic' => array('high contrast', 'bold shadows', 'intense lighting', 'strong colors'),
+            'soft' => array('soft lighting', 'gentle colors', 'dreamy atmosphere', 'subtle effects'),
+            'artistic' => array('creative color grading', 'artistic filters', 'stylized look'),
+            'cinematic' => array('cinematic color grading', 'film-like atmosphere', 'dramatic composition'),
+            'bright' => array('increased brightness', 'vibrant colors', 'enhanced saturation'),
+            'dark' => array('reduced brightness', 'enhanced shadows', 'moody atmosphere', 'mysterious tones')
+        );
+        
+        return isset($style_effects[$style]) ? $style_effects[$style] : array();
+    }
+    
+    /**
+     * Detect compound instructions (multiple transformations)
+     */
+    private function detect_compound_instructions($instructions) {
+        $transformations = array();
+        
+        // Look for connecting words that indicate multiple transformations
+        $connectors = array('and', 've', 'with', 'plus', 'also', 'then', 'also add', 'ayrıca', 'ile', 'artı');
+        
+        foreach ($connectors as $connector) {
+            if (strpos($instructions, $connector) !== false) {
+                $transformations['compound'] = true;
+                $transformations['multiple_transforms'] = true;
+                break;
+            }
+        }
+        
+        return $transformations;
+    }
+    
+    /**
+     * Handle creative and abstract instructions
+     */
+    private function handle_creative_instructions($instructions) {
+        $transformations = array();
+        
+        // Creative instruction patterns
+        $creative_patterns = array(
+            'magical' => array('magical', 'mystical', 'enchanted', 'fantasy', 'sihirli', 'büyülü', 'fantastik'),
+            'surreal' => array('surreal', 'abstract', 'weird', 'strange', 'gerçeküstü', 'soyut', 'tuhaf'),
+            'emotion_happy' => array('happy', 'joyful', 'cheerful', 'bright', 'mutlu', 'neşeli', 'sevimli'),
+            'emotion_sad' => array('sad', 'melancholy', 'gloomy', 'depressing', 'üzgün', 'kasvetli', 'melankolik'),
+            'energy_high' => array('energetic', 'dynamic', 'active', 'lively', 'enerjik', 'dinamik', 'hareketli'),
+            'energy_calm' => array('peaceful', 'calm', 'serene', 'tranquil', 'huzurlu', 'sakin', 'dingin')
+        );
+        
+        foreach ($creative_patterns as $type => $patterns) {
+            foreach ($patterns as $pattern) {
+                if (strpos($instructions, $pattern) !== false) {
+                    $transformations['creative_type'] = $type;
+                    $transformations['creative_effects'] = $this->get_creative_effects($type);
+                    break 2;
+                }
+            }
+        }
+        
+        return $transformations;
+    }
+    
+    /**
+     * Get effects for creative transformations
+     */
+    private function get_creative_effects($type) {
+        $creative_effects = array(
+            'magical' => array('ethereal glow', 'sparkles', 'mystical atmosphere', 'enchanted lighting'),
+            'surreal' => array('unusual colors', 'distorted elements', 'abstract effects', 'surreal atmosphere'),
+            'emotion_happy' => array('warm colors', 'bright lighting', 'cheerful atmosphere', 'vibrant tones'),
+            'emotion_sad' => array('cool colors', 'muted tones', 'melancholic atmosphere', 'soft shadows'),
+            'energy_high' => array('dynamic colors', 'enhanced contrast', 'energetic atmosphere', 'vibrant effects'),
+            'energy_calm' => array('soft colors', 'gentle lighting', 'peaceful atmosphere', 'serene tones')
+        );
+        
+        return isset($creative_effects[$type]) ? $creative_effects[$type] : array();
+    }
+    }
 
     /**
-     * Create comprehensive prompt for DALL-E based on image analysis and user instructions
+     * Create intelligent and comprehensive prompt for DALL-E based on image analysis and user instructions
+     * Enhanced to produce unique outputs for different instruction variations
      * 
      * @param string $image_description Description from Vision API
      * @param string $user_instructions User's transformation instructions
@@ -604,92 +1035,215 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         // Parse instructions to understand what transformations are needed
         $transformations = $this->parse_transformation_instructions($user_instructions);
         
-        // Create a comprehensive prompt for dramatic transformation
-        if (isset($transformations['comprehensive']) && $transformations['comprehensive']) {
-            // For comprehensive transformations like snow/weather changes
-            $prompt = "Create a photorealistic image that recreates the EXACT same subjects, poses, and composition from this description: " . $image_description;
-            
-            $prompt .= "\n\nNow apply these DRAMATIC and COMPREHENSIVE environmental transformations:";
-            
-            // Environment and background changes
-            if (isset($transformations['background'])) {
-                $prompt .= "\n- COMPLETELY CHANGE BACKGROUND: " . $transformations['background'];
-            }
-            
-            // Weather transformation
-            if (isset($transformations['weather'])) {
-                $prompt .= "\n- WEATHER CONDITIONS: Add intense " . $transformations['weather'] . " throughout the entire scene";
-            }
-            
-            // Atmospheric changes
-            if (isset($transformations['atmosphere'])) {
-                $prompt .= "\n- ATMOSPHERIC CHANGE: Transform to " . $transformations['atmosphere'];
-            }
-            
-            // Lighting changes
-            if (isset($transformations['lighting'])) {
-                $prompt .= "\n- LIGHTING TRANSFORMATION: Change to " . $transformations['lighting'];
-            }
-            
-            // Visual effects
-            if (isset($transformations['effects']) && is_array($transformations['effects'])) {
-                $prompt .= "\n- VISUAL EFFECTS: " . implode(', ', $transformations['effects']);
-            }
-            
-            $prompt .= "\n\nCRITICAL REQUIREMENTS:";
-            $prompt .= "\n- Keep the EXACT same people, their poses, expressions, and positioning";
-            $prompt .= "\n- Maintain the same camera angle and composition";
-            $prompt .= "\n- Make the environmental transformation DRAMATIC and COMPREHENSIVE";
-            $prompt .= "\n- The transformation must be immediately obvious and striking";
-            $prompt .= "\n- Apply the changes to the ENTIRE scene, not just overlays";
-            $prompt .= "\n- Create a completely new environment while preserving the subjects";
-            
-        } else {
-            // Start with the base image description for other transformations
-            $prompt = "Create a photorealistic image with the following base elements from the original: " . $image_description;
-            
-            // Apply other transformations
-            if (!empty($transformations)) {
-                $prompt .= "\n\nNow apply these comprehensive transformations:";
-                
-                // Environment and background changes
-                if (isset($transformations['background'])) {
-                    $prompt .= "\n- BACKGROUND: Completely transform the background to: " . $transformations['background'];
-                }
-                
-                // Atmospheric changes
-                if (isset($transformations['atmosphere'])) {
-                    $prompt .= "\n- ATMOSPHERE: Change the overall atmosphere to: " . $transformations['atmosphere'];
-                }
-                
-                // Lighting changes
-                if (isset($transformations['lighting'])) {
-                    $prompt .= "\n- LIGHTING: Adjust lighting to: " . $transformations['lighting'];
-                }
-                
-                // Environmental effects
-                if (isset($transformations['weather'])) {
-                    $prompt .= "\n- WEATHER: Add " . $transformations['weather'] . " weather conditions";
-                }
-                
-                // Visual effects
-                if (isset($transformations['effects']) && is_array($transformations['effects'])) {
-                    $prompt .= "\n- EFFECTS: Include these visual elements: " . implode(', ', $transformations['effects']);
-                }
-                
-                // Style modifications
-                if (isset($transformations['style'])) {
-                    $prompt .= "\n- STYLE: Apply " . $transformations['style'] . " photographic style";
-                }
-            } else {
-                // If no specific transformations detected, use original instructions
-                $prompt .= "\n\nApply these modifications while maintaining realism: " . sanitize_text_field($user_instructions);
-            }
-            
-            $prompt .= "\n\nIMPORTANT: Keep the same subjects, poses, and basic composition from the original image while applying these environmental and atmospheric transformations. Ensure all changes look natural and photorealistic. The transformation should be comprehensive and dramatically visible.";
-        }
+        // Create intelligent prompt based on instruction analysis
+        $prompt = $this->build_intelligent_base_prompt($image_description, $transformations);
+        
+        // Add specific transformations based on analysis
+        $prompt .= $this->build_transformation_sections($transformations);
+        
+        // Add intensity and style modifiers
+        $prompt .= $this->build_intensity_modifiers($transformations);
+        
+        // Add creative and compound instruction handling
+        $prompt .= $this->build_creative_modifiers($transformations);
+        
+        // Add critical requirements with dynamic adjustments
+        $prompt .= $this->build_critical_requirements($transformations);
+        
+        // Add uniqueness elements to ensure varied outputs
+        $prompt .= $this->add_uniqueness_factors($transformations);
         
         return $prompt;
+    }
+    
+    /**
+     * Build intelligent base prompt based on transformation analysis
+     */
+    private function build_intelligent_base_prompt($image_description, $transformations) {
+        $base_prompt = "Create a photorealistic image that recreates the EXACT same subjects, poses, and composition from this description: " . $image_description;
+        
+        // Add transformation intent based on analysis
+        if (isset($transformations['comprehensive']) && $transformations['comprehensive']) {
+            $base_prompt .= "\n\nIMPORTANT: This requires COMPREHENSIVE environmental transformation - completely reimagining the scene while preserving the subjects.";
+        }
+        
+        if (isset($transformations['multiple_transforms']) && $transformations['multiple_transforms']) {
+            $base_prompt .= "\n\nNOTE: This involves MULTIPLE simultaneous transformations that must be carefully balanced.";
+        }
+        
+        if (isset($transformations['creative_type'])) {
+            $base_prompt .= "\n\nCREATIVE APPROACH: Apply creative and artistic interpretation for " . $transformations['creative_type'] . " aesthetic.";
+        }
+        
+        return $base_prompt;
+    }
+    
+    /**
+     * Build transformation sections dynamically
+     */
+    private function build_transformation_sections($transformations) {
+        $sections = "\n\nApply these SPECIFIC transformations:";
+        
+        // Environment and weather with intensity
+        if (isset($transformations['environment'])) {
+            $intensity = isset($transformations['intensity_level']) ? $transformations['intensity_level'] : 'medium';
+            $sections .= "\n- ENVIRONMENT: Transform to " . $transformations['environment'] . " environment with " . $intensity . " intensity";
+        }
+        
+        // Background replacement with specificity
+        if (isset($transformations['background'])) {
+            $sections .= "\n- BACKGROUND REPLACEMENT: Completely replace with: " . $transformations['background'];
+        }
+        
+        // Weather conditions with dynamic description
+        if (isset($transformations['weather'])) {
+            $sections .= "\n- WEATHER CONDITIONS: " . $transformations['weather'];
+        }
+        
+        // Atmospheric changes
+        if (isset($transformations['atmosphere'])) {
+            $sections .= "\n- ATMOSPHERE: " . $transformations['atmosphere'];
+        }
+        
+        // Lighting with context
+        if (isset($transformations['lighting'])) {
+            $sections .= "\n- LIGHTING: " . $transformations['lighting'];
+        }
+        
+        // Visual effects with layering
+        if (isset($transformations['effects']) && is_array($transformations['effects'])) {
+            $sections .= "\n- VISUAL EFFECTS (apply all): " . implode(', ', $transformations['effects']);
+        }
+        
+        // Location-specific elements
+        if (isset($transformations['location'])) {
+            $sections .= "\n- LOCATION SETTING: Incorporate " . $transformations['location'] . " environmental elements";
+        }
+        
+        return $sections;
+    }
+    
+    /**
+     * Build intensity and style modifiers
+     */
+    private function build_intensity_modifiers($transformations) {
+        $modifiers = "";
+        
+        // Intensity adjustments
+        if (isset($transformations['intensity'])) {
+            switch ($transformations['intensity']) {
+                case 'extreme':
+                    $modifiers .= "\n\nINTENSITY: Apply MAXIMUM transformation strength - make changes highly dramatic and immediately obvious";
+                    break;
+                case 'high':
+                    $modifiers .= "\n\nINTENSITY: Apply STRONG transformation effects - make changes clearly visible and impactful";
+                    break;
+                case 'light':
+                    $modifiers .= "\n\nINTENSITY: Apply SUBTLE transformation effects - make changes gentle but still noticeable";
+                    break;
+                case 'minimal':
+                    $modifiers .= "\n\nINTENSITY: Apply VERY SUBTLE effects - minimal but tasteful changes";
+                    break;
+                default:
+                    $modifiers .= "\n\nINTENSITY: Apply BALANCED transformation effects - clearly visible but natural-looking";
+            }
+        }
+        
+        // Style applications
+        if (isset($transformations['style'])) {
+            $modifiers .= "\n\nSTYLE APPLICATION: Apply " . $transformations['style'] . " photographic style";
+            if (isset($transformations['style_effects']) && is_array($transformations['style_effects'])) {
+                $modifiers .= " with these specific elements: " . implode(', ', $transformations['style_effects']);
+            }
+        }
+        
+        return $modifiers;
+    }
+    
+    /**
+     * Build creative and compound instruction modifiers
+     */
+    private function build_creative_modifiers($transformations) {
+        $creative = "";
+        
+        // Creative instruction handling
+        if (isset($transformations['creative_type'])) {
+            $creative .= "\n\nCREATIVE INTERPRETATION: Apply " . $transformations['creative_type'] . " aesthetic";
+            if (isset($transformations['creative_effects']) && is_array($transformations['creative_effects'])) {
+                $creative .= " incorporating: " . implode(', ', $transformations['creative_effects']);
+            }
+        }
+        
+        // Compound instruction handling
+        if (isset($transformations['multiple_transforms']) && $transformations['multiple_transforms']) {
+            $creative .= "\n\nMULTIPLE TRANSFORMATIONS: Carefully balance and blend all requested changes to create a harmonious final result";
+        }
+        
+        // Action verb-based modifications
+        if (isset($transformations['action_verbs']) && is_array($transformations['action_verbs'])) {
+            $verbs = implode(', ', $transformations['action_verbs']);
+            $creative .= "\n\nACTION APPROACH: Focus on " . $verbs . " operations - make the transformations match these specific action intentions";
+        }
+        
+        return $creative;
+    }
+    
+    /**
+     * Build critical requirements with dynamic adjustments
+     */
+    private function build_critical_requirements($transformations) {
+        $requirements = "\n\nCRITICAL REQUIREMENTS:";
+        $requirements .= "\n- PRESERVE SUBJECTS: Keep the EXACT same people, their poses, expressions, and positioning";
+        $requirements .= "\n- MAINTAIN COMPOSITION: Keep the same camera angle and framing";
+        
+        // Dynamic requirements based on transformation type
+        if (isset($transformations['background_replace']) && $transformations['background_replace']) {
+            $requirements .= "\n- BACKGROUND TRANSFORMATION: Completely change the background while seamlessly integrating subjects";
+        }
+        
+        if (isset($transformations['comprehensive']) && $transformations['comprehensive']) {
+            $requirements .= "\n- COMPREHENSIVE CHANGE: Make environmental transformation DRAMATIC and immediately obvious";
+            $requirements .= "\n- SCENE RECREATION: Create entirely new environmental context while preserving human subjects";
+        }
+        
+        if (isset($transformations['intensity']) && in_array($transformations['intensity'], array('extreme', 'high'))) {
+            $requirements .= "\n- HIGH IMPACT: Ensure transformations are highly visible and dramatically alter the scene's mood";
+        }
+        
+        $requirements .= "\n- PHOTOREALISM: Maintain photorealistic quality throughout all transformations";
+        $requirements .= "\n- NATURAL INTEGRATION: Ensure all changes look natural and believable";
+        
+        return $requirements;
+    }
+    
+    /**
+     * Add uniqueness factors to ensure varied outputs for different instructions
+     */
+    private function add_uniqueness_factors($transformations) {
+        $uniqueness = "\n\nUNIQUENESS FACTORS:";
+        
+        // Add specific contextual elements based on the original instruction
+        if (isset($transformations['original_text'])) {
+            $instruction_hash = substr(md5($transformations['original_text']), 0, 8);
+            $uniqueness .= "\n- INSTRUCTION SIGNATURE: " . $instruction_hash . " - ensure this specific interpretation is unique";
+        }
+        
+        // Add variation prompts based on transformation type
+        if (isset($transformations['environment'])) {
+            $uniqueness .= "\n- ENVIRONMENTAL SPECIFICITY: Focus specifically on " . $transformations['environment'] . " characteristics that make this scene unique";
+        }
+        
+        // Add descriptive term integration
+        if (isset($transformations['descriptive_terms']) && !empty($transformations['descriptive_terms'])) {
+            foreach ($transformations['descriptive_terms'] as $category => $terms) {
+                $uniqueness .= "\n- " . strtoupper($category) . " INTEGRATION: Incorporate " . implode(', ', $terms) . " qualities";
+            }
+        }
+        
+        // Add temporal uniqueness
+        $uniqueness .= "\n- TEMPORAL CONTEXT: Consider this specific moment and instruction context for unique interpretation";
+        
+        return $uniqueness;
     }
     
     /**
@@ -865,8 +1419,8 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     }
     
     /**
-     * Apply advanced transformations based on parsed instructions
-     * Sophisticated image processing with background replacement capabilities
+     * Apply advanced transformations based on intelligent instruction parsing
+     * Enhanced to produce varied results based on specific instruction analysis
      * 
      * @param resource $image_resource GD image resource
      * @param array $transformations Parsed transformation requirements
@@ -874,128 +1428,1114 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
      * @param int $height Image height
      */
     private function apply_advanced_transformations($image_resource, $transformations, $width, $height) {
-        // If background replacement is requested, apply comprehensive scene transformation
-        if (isset($transformations['background_replace']) && $transformations['background_replace']) {
-            $this->apply_background_replacement($image_resource, $transformations, $width, $height);
+        // Apply transformations based on intelligent analysis
+        $this->apply_intelligent_base_adjustments($image_resource, $transformations);
+        
+        // Apply environment-specific transformations with intensity awareness
+        if (isset($transformations['environment'])) {
+            $intensity = isset($transformations['intensity_level']) ? $transformations['intensity_level'] : 'medium';
+            $this->apply_environment_transformation($image_resource, $transformations['environment'], $intensity, $width, $height);
         }
         
-        // Apply environment-specific transformations
-        if (isset($transformations['environment'])) {
-            switch ($transformations['environment']) {
-                case 'winter':
-                    $this->create_comprehensive_winter_scene($image_resource, $width, $height);
+        // Apply background replacement if requested
+        if (isset($transformations['background_replace']) && $transformations['background_replace']) {
+            $this->apply_intelligent_background_replacement($image_resource, $transformations, $width, $height);
+        }
+        
+        // Apply style transformations with context
+        if (isset($transformations['style'])) {
+            $this->apply_style_transformation($image_resource, $transformations['style'], $transformations);
+        }
+        
+        // Apply creative transformations
+        if (isset($transformations['creative_type'])) {
+            $this->apply_creative_transformation($image_resource, $transformations['creative_type'], $transformations, $width, $height);
+        }
+        
+        // Apply compound transformations if multiple effects requested
+        if (isset($transformations['multiple_transforms']) && $transformations['multiple_transforms']) {
+            $this->blend_multiple_transformations($image_resource, $transformations, $width, $height);
+        }
+        
+        // Apply legacy processing for fallback compatibility
+        if (!isset($transformations['environment']) && !isset($transformations['style']) && !isset($transformations['creative_type'])) {
+            $this->apply_legacy_processing($image_resource, $transformations, $width, $height);
+        }
+    }
+    
+    /**
+     * Apply intelligent base adjustments based on instruction analysis
+     */
+    private function apply_intelligent_base_adjustments($image_resource, $transformations) {
+        // Apply intensity-based adjustments
+        if (isset($transformations['intensity'])) {
+            switch ($transformations['intensity']) {
+                case 'extreme':
+                    imagefilter($image_resource, IMG_FILTER_CONTRAST, 25);
+                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
                     break;
-                case 'rainy':
-                    $this->create_comprehensive_rainy_scene($image_resource, $width, $height);
+                case 'high':
+                    imagefilter($image_resource, IMG_FILTER_CONTRAST, 15);
+                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 5);
                     break;
-                case 'sunset':
-                    $this->create_comprehensive_sunset_scene($image_resource, $width, $height);
+                case 'light':
+                    imagefilter($image_resource, IMG_FILTER_CONTRAST, 3);
+                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 3);
                     break;
-                case 'night':
-                    $this->create_comprehensive_night_scene($image_resource, $width, $height);
-                    break;
-                case 'autumn':
-                    $this->create_comprehensive_autumn_scene($image_resource, $width, $height);
-                    break;
-                case 'spring':
-                    $this->create_comprehensive_spring_scene($image_resource, $width, $height);
-                    break;
-                case 'summer':
-                    $this->create_comprehensive_summer_scene($image_resource, $width, $height);
+                case 'minimal':
+                    imagefilter($image_resource, IMG_FILTER_CONTRAST, 1);
+                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 2);
                     break;
             }
         }
         
-        // Apply legacy processing if no specific environment is detected
-        else {
-            $instructions = '';
-            if (isset($transformations['effects'])) {
-                $instructions = implode(' ', $transformations['effects']);
+        // Apply descriptive term adjustments
+        if (isset($transformations['descriptive_terms'])) {
+            if (isset($transformations['descriptive_terms']['color'])) {
+                foreach ($transformations['descriptive_terms']['color'] as $color_term) {
+                    $this->apply_color_adjustment($image_resource, $color_term);
+                }
             }
             
-            // Legacy keyword-based processing for backward compatibility
-            if (strpos($instructions, 'snow') !== false) {
-                $this->create_comprehensive_winter_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'rain') !== false) {
-                $this->create_comprehensive_rainy_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'sunset') !== false || strpos($instructions, 'golden hour') !== false) {
-                $this->create_comprehensive_sunset_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'night') !== false) {
-                $this->create_comprehensive_night_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'autumn') !== false || strpos($instructions, 'fall') !== false) {
-                $this->create_comprehensive_autumn_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'spring') !== false) {
-                $this->create_comprehensive_spring_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'summer') !== false) {
-                $this->create_comprehensive_summer_scene($image_resource, $width, $height);
-            }
-            elseif (strpos($instructions, 'vintage') !== false || strpos($instructions, 'sepia') !== false) {
-                $this->add_vintage_effect($image_resource);
-            }
-            elseif (strpos($instructions, 'black and white') !== false || strpos($instructions, 'grayscale') !== false) {
-                imagefilter($image_resource, IMG_FILTER_GRAYSCALE);
-            }
-            else {
-                // Default: Apply subtle enhancement
-                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
-                imagefilter($image_resource, IMG_FILTER_CONTRAST, 5);
-            }
-        }
-        
-        // Apply style transformations
-        if (isset($transformations['style'])) {
-            switch ($transformations['style']) {
-                case 'vintage':
-                    $this->add_vintage_effect($image_resource);
-                    break;
-                case 'dramatic':
-                    imagefilter($image_resource, IMG_FILTER_CONTRAST, 20);
-                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -5);
-                    break;
-                case 'soft':
-                    imagefilter($image_resource, IMG_FILTER_SMOOTH, 3);
-                    imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 8);
-                    break;
+            if (isset($transformations['descriptive_terms']['mood'])) {
+                foreach ($transformations['descriptive_terms']['mood'] as $mood_term) {
+                    $this->apply_mood_adjustment($image_resource, $mood_term);
+                }
             }
         }
     }
     
     /**
-     * Apply sophisticated background replacement
-     * Creates gradient overlays and masking effects for natural background changes
+     * Apply environment transformation with intensity
      */
-    private function apply_background_replacement($image_resource, $transformations, $width, $height) {
-        // Create background overlay based on transformation type
+    private function apply_environment_transformation($image_resource, $environment, $intensity, $width, $height) {
+        switch ($environment) {
+            case 'winter':
+                $this->create_intelligent_winter_scene($image_resource, $width, $height, $intensity);
+                break;
+            case 'rainy':
+                $this->create_intelligent_rainy_scene($image_resource, $width, $height, $intensity);
+                break;
+            case 'sunset':
+                $this->create_intelligent_sunset_scene($image_resource, $width, $height, $intensity);
+                break;
+            case 'night':
+                $this->create_intelligent_night_scene($image_resource, $width, $height, $intensity);
+                break;
+            case 'autumn':
+                $this->create_intelligent_autumn_scene($image_resource, $width, $height, $intensity);
+                break;
+            case 'spring':
+                $this->create_intelligent_spring_scene($image_resource, $width, $height, $intensity);
+                break;
+            case 'summer':
+                $this->create_intelligent_summer_scene($image_resource, $width, $height, $intensity);
+                break;
+        }
+    }
+    
+    /**
+     * Apply intelligent background replacement based on context
+     */
+    private function apply_intelligent_background_replacement($image_resource, $transformations, $width, $height) {
+        // Create background overlay based on transformation type and context
         if (isset($transformations['environment'])) {
+            $intensity = isset($transformations['intensity']) ? $transformations['intensity'] : 'medium';
+            
             switch ($transformations['environment']) {
                 case 'winter':
-                    $this->create_winter_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_winter_background_overlay($image_resource, $width, $height, $intensity);
                     break;
                 case 'rainy':
-                    $this->create_stormy_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_stormy_background_overlay($image_resource, $width, $height, $intensity);
                     break;
                 case 'sunset':
-                    $this->create_sunset_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_sunset_background_overlay($image_resource, $width, $height, $intensity);
                     break;
                 case 'night':
-                    $this->create_night_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_night_background_overlay($image_resource, $width, $height, $intensity);
                     break;
                 case 'autumn':
-                    $this->create_autumn_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_autumn_background_overlay($image_resource, $width, $height, $intensity);
                     break;
                 case 'spring':
-                    $this->create_spring_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_spring_background_overlay($image_resource, $width, $height, $intensity);
                     break;
                 case 'summer':
-                    $this->create_summer_background_overlay($image_resource, $width, $height);
+                    $this->create_intelligent_summer_background_overlay($image_resource, $width, $height, $intensity);
                     break;
             }
+        } elseif (isset($transformations['location'])) {
+            $this->create_location_background_overlay($image_resource, $transformations['location'], $width, $height);
+        }
+    }
+    
+    /**
+     * Apply color adjustments based on descriptive terms
+     */
+    private function apply_color_adjustment($image_resource, $color_term) {
+        switch ($color_term) {
+            case 'vibrant':
+            case 'canlı':
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, 15);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 5);
+                break;
+            case 'warm':
+            case 'sıcak':
+                imagefilter($image_resource, IMG_FILTER_COLORIZE, 20, 10, -15);
+                break;
+            case 'cool':
+            case 'soğuk':
+                imagefilter($image_resource, IMG_FILTER_COLORIZE, -15, -5, 20);
+                break;
+            case 'bright':
+            case 'parlak':
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 15);
+                break;
+            case 'dark':
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -15);
+                break;
+        }
+    }
+    
+    /**
+     * Apply mood adjustments based on descriptive terms
+     */
+    private function apply_mood_adjustment($image_resource, $mood_term) {
+        switch ($mood_term) {
+            case 'dramatic':
+            case 'dramatik':
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, 20);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -5);
+                break;
+            case 'soft':
+            case 'yumuşak':
+                imagefilter($image_resource, IMG_FILTER_SMOOTH, 5);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 8);
+                break;
+            case 'dreamy':
+            case 'rüya gibi':
+                imagefilter($image_resource, IMG_FILTER_SMOOTH, 3);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 12);
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, -8);
+                break;
+            case 'mysterious':
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -20);
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, 15);
+                break;
+        }
+    }
+    
+    /**
+     * Apply style transformations with enhanced context awareness
+     */
+    private function apply_style_transformation($image_resource, $style, $transformations) {
+        $intensity_modifier = isset($transformations['intensity']) ? $this->get_intensity_modifier($transformations['intensity']) : 1.0;
+        
+        switch ($style) {
+            case 'vintage':
+                $this->apply_enhanced_vintage_effect($image_resource, $intensity_modifier);
+                break;
+            case 'dramatic':
+                $contrast = (int)(20 * $intensity_modifier);
+                $brightness = (int)(-5 * $intensity_modifier);
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, $contrast);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, $brightness);
+                break;
+            case 'soft':
+                $smooth = (int)(3 * $intensity_modifier);
+                $brightness = (int)(8 * $intensity_modifier);
+                imagefilter($image_resource, IMG_FILTER_SMOOTH, $smooth);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, $brightness);
+                break;
+            case 'cinematic':
+                $this->apply_cinematic_effect($image_resource, $intensity_modifier);
+                break;
+            case 'artistic':
+                $this->apply_artistic_effect($image_resource, $intensity_modifier);
+                break;
+            case 'bright':
+                $brightness = (int)(20 * $intensity_modifier);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, $brightness);
+                break;
+            case 'dark':
+                $brightness = (int)(-25 * $intensity_modifier);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, $brightness);
+                break;
+        }
+    }
+    
+    /**
+     * Apply creative transformations
+     */
+    private function apply_creative_transformation($image_resource, $creative_type, $transformations, $width, $height) {
+        switch ($creative_type) {
+            case 'magical':
+                $this->apply_magical_effect($image_resource, $width, $height);
+                break;
+            case 'surreal':
+                $this->apply_surreal_effect($image_resource);
+                break;
+            case 'emotion_happy':
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 15);
+                imagefilter($image_resource, IMG_FILTER_COLORIZE, 15, 10, -10);
+                break;
+            case 'emotion_sad':
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -10);
+                imagefilter($image_resource, IMG_FILTER_COLORIZE, -10, -5, 15);
+                break;
+            case 'energy_high':
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, 25);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+                break;
+            case 'energy_calm':
+                imagefilter($image_resource, IMG_FILTER_SMOOTH, 5);
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 5);
+                break;
+        }
+    }
+    
+    /**
+     * Get intensity modifier value
+     */
+    private function get_intensity_modifier($intensity) {
+        switch ($intensity) {
+            case 'extreme': return 1.8;
+            case 'high': return 1.4;
+            case 'light': return 0.6;
+            case 'minimal': return 0.3;
+            default: return 1.0; // medium
+        }
+    }
+    
+    /**
+     * Apply enhanced vintage effect with intensity
+     */
+    private function apply_enhanced_vintage_effect($image_resource, $intensity_modifier) {
+        // Apply sepia tone with intensity
+        imagefilter($image_resource, IMG_FILTER_GRAYSCALE);
+        $sepia_r = (int)(90 * $intensity_modifier);
+        $sepia_g = (int)(60 * $intensity_modifier);
+        $sepia_b = (int)(40 * $intensity_modifier);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, $sepia_r, $sepia_g, $sepia_b);
+        
+        // Vintage adjustments
+        $contrast = (int)(-10 * $intensity_modifier);
+        $brightness = (int)(-5 * $intensity_modifier);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, $contrast);
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, $brightness);
+    }
+    
+    /**
+     * Apply cinematic effect
+     */
+    private function apply_cinematic_effect($image_resource, $intensity_modifier) {
+        // Cinematic color grading
+        $colorize_r = (int)(10 * $intensity_modifier);
+        $colorize_g = (int)(5 * $intensity_modifier);
+        $colorize_b = (int)(-10 * $intensity_modifier);
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, $colorize_r, $colorize_g, $colorize_b);
+        
+        $contrast = (int)(15 * $intensity_modifier);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, $contrast);
+    }
+    
+    /**
+     * Apply artistic effect
+     */
+    private function apply_artistic_effect($image_resource, $intensity_modifier) {
+        // Artistic enhancement
+        $smooth = (int)(2 * $intensity_modifier);
+        $contrast = (int)(10 * $intensity_modifier);
+        imagefilter($image_resource, IMG_FILTER_SMOOTH, $smooth);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, $contrast);
+    }
+    
+    /**
+     * Apply magical effect with sparkles
+     */
+    private function apply_magical_effect($image_resource, $width, $height) {
+        // Create magical sparkles overlay
+        $sparkles = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($sparkles, 0, 0, 0, 127);
+        imagefill($sparkles, 0, 0, $transparent);
+        imagesavealpha($sparkles, true);
+        
+        // Add sparkles
+        for ($i = 0; $i < 50; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $size = rand(1, 4);
+            $sparkle_color = imagecolorallocatealpha($sparkles, 255, 255, 200, rand(60, 100));
+            imagefilledellipse($sparkles, $x, $y, $size, $size, $sparkle_color);
+        }
+        
+        // Apply ethereal glow
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+        imagefilter($image_resource, IMG_FILTER_SMOOTH, 2);
+        
+        // Merge sparkles
+        imagealphablending($image_resource, true);
+        imagecopymerge($image_resource, $sparkles, 0, 0, 0, 0, $width, $height, 40);
+        imagedestroy($sparkles);
+    }
+    
+    /**
+     * Apply surreal effect
+     */
+    private function apply_surreal_effect($image_resource) {
+        // Surreal color adjustments
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, rand(-30, 30), rand(-30, 30), rand(-30, 30));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, rand(5, 25));
+    }
+    
+    
+    /**
+     * Blend multiple transformations for compound instructions
+     */
+    private function blend_multiple_transformations($image_resource, $transformations, $width, $height) {
+        // Apply multiple transformations with balanced intensity
+        $intensity_reduction = 0.7; // Reduce intensity when combining multiple effects
+        
+        // Apply each transformation with reduced intensity
+        if (isset($transformations['environment'])) {
+            $reduced_intensity = $this->reduce_intensity($transformations['intensity_level'] ?? 'medium');
+            $this->apply_environment_transformation($image_resource, $transformations['environment'], $reduced_intensity, $width, $height);
+        }
+        
+        if (isset($transformations['style'])) {
+            $reduced_transformations = $transformations;
+            $reduced_transformations['intensity'] = $this->reduce_intensity($transformations['intensity'] ?? 'medium');
+            $this->apply_style_transformation($image_resource, $transformations['style'], $reduced_transformations);
+        }
+    }
+    
+    /**
+     * Reduce intensity level for compound transformations
+     */
+    private function reduce_intensity($intensity) {
+        $intensity_map = array(
+            'extreme' => 'high',
+            'high' => 'medium', 
+            'medium' => 'light',
+            'light' => 'minimal',
+            'minimal' => 'minimal'
+        );
+        
+        return isset($intensity_map[$intensity]) ? $intensity_map[$intensity] : 'medium';
+    }
+    
+    /**
+     * Apply legacy processing for backward compatibility
+     */
+    private function apply_legacy_processing($image_resource, $transformations, $width, $height) {
+        $effects = isset($transformations['effects']) ? implode(' ', $transformations['effects']) : '';
+        $original_text = isset($transformations['original_text']) ? strtolower($transformations['original_text']) : '';
+        $instructions = $effects . ' ' . $original_text;
+        
+        // Legacy keyword-based processing
+        if (strpos($instructions, 'snow') !== false || strpos($instructions, 'kar') !== false) {
+            $this->create_comprehensive_winter_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'rain') !== false || strpos($instructions, 'yağmur') !== false) {
+            $this->create_comprehensive_rainy_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'sunset') !== false || strpos($instructions, 'golden hour') !== false) {
+            $this->create_comprehensive_sunset_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'night') !== false || strpos($instructions, 'gece') !== false) {
+            $this->create_comprehensive_night_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'autumn') !== false || strpos($instructions, 'fall') !== false || strpos($instructions, 'sonbahar') !== false) {
+            $this->create_comprehensive_autumn_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'spring') !== false || strpos($instructions, 'ilkbahar') !== false) {
+            $this->create_comprehensive_spring_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'summer') !== false || strpos($instructions, 'yaz') !== false) {
+            $this->create_comprehensive_summer_scene($image_resource, $width, $height);
+        }
+        elseif (strpos($instructions, 'vintage') !== false || strpos($instructions, 'sepia') !== false) {
+            $this->add_vintage_effect($image_resource);
+        }
+        elseif (strpos($instructions, 'black and white') !== false || strpos($instructions, 'grayscale') !== false) {
+            imagefilter($image_resource, IMG_FILTER_GRAYSCALE);
+        }
+        else {
+            // Default: Apply enhancement based on available information
+            $brightness = isset($transformations['intensity']) && $transformations['intensity'] === 'light' ? 5 : 10;
+            $contrast = isset($transformations['intensity']) && $transformations['intensity'] === 'extreme' ? 15 : 5;
+            
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, $brightness);
+            imagefilter($image_resource, IMG_FILTER_CONTRAST, $contrast);
+        }
+    }
+    
+    /**
+     * Create intelligent winter scene with dynamic intensity
+     */
+    private function create_intelligent_winter_scene($image_resource, $width, $height, $intensity = 'medium') {
+        // Base winter atmosphere
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        $brightness_mod = $this->get_brightness_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(-15 * $color_intensity), (int)(-10 * $color_intensity), (int)(20 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, (int)(20 * $brightness_mod));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(-8 * $color_intensity));
+        
+        // Create snow effects based on intensity
+        $this->add_intelligent_snow_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Create intelligent rainy scene with dynamic intensity
+     */
+    private function create_intelligent_rainy_scene($image_resource, $width, $height, $intensity = 'medium') {
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        $brightness_mod = $this->get_brightness_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, (int)(-25 * $brightness_mod));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(15 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(-15 * $color_intensity), (int)(-15 * $color_intensity), (int)(10 * $color_intensity));
+        
+        $this->add_intelligent_rain_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Create intelligent sunset scene with dynamic intensity
+     */
+    private function create_intelligent_sunset_scene($image_resource, $width, $height, $intensity = 'medium') {
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        $brightness_mod = $this->get_brightness_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(50 * $color_intensity), (int)(25 * $color_intensity), (int)(-40 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, (int)(15 * $brightness_mod));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(8 * $color_intensity));
+        
+        $this->add_intelligent_sunset_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Create intelligent night scene with dynamic intensity
+     */
+    private function create_intelligent_night_scene($image_resource, $width, $height, $intensity = 'medium') {
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        $brightness_mod = $this->get_brightness_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, (int)(-40 * $brightness_mod));
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(-20 * $color_intensity), (int)(-15 * $color_intensity), (int)(30 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(20 * $color_intensity));
+        
+        $this->add_intelligent_night_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Create intelligent autumn scene with dynamic intensity
+     */
+    private function create_intelligent_autumn_scene($image_resource, $width, $height, $intensity = 'medium') {
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(40 * $color_intensity), (int)(15 * $color_intensity), (int)(-25 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(8 * $color_intensity));
+        
+        $this->add_intelligent_autumn_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Create intelligent spring scene with dynamic intensity
+     */
+    private function create_intelligent_spring_scene($image_resource, $width, $height, $intensity = 'medium') {
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        $brightness_mod = $this->get_brightness_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(-10 * $color_intensity), (int)(20 * $color_intensity), (int)(-15 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, (int)(10 * $brightness_mod));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(5 * $color_intensity));
+        
+        $this->add_intelligent_spring_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Create intelligent summer scene with dynamic intensity
+     */
+    private function create_intelligent_summer_scene($image_resource, $width, $height, $intensity = 'medium') {
+        $color_intensity = $this->get_color_intensity_modifier($intensity);
+        $brightness_mod = $this->get_brightness_modifier($intensity);
+        
+        imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, (int)(15 * $brightness_mod));
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, (int)(8 * $color_intensity));
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, (int)(10 * $color_intensity), (int)(5 * $color_intensity), (int)(-15 * $color_intensity));
+        
+        $this->add_intelligent_summer_effect($image_resource, $width, $height, $intensity);
+    }
+    
+    /**
+     * Get color intensity modifier based on intensity level
+     */
+    private function get_color_intensity_modifier($intensity) {
+        switch ($intensity) {
+            case 'extreme': return 1.8;
+            case 'high': return 1.4;
+            case 'light': return 0.6;
+            case 'minimal': return 0.3;
+            default: return 1.0;
+        }
+    }
+    
+    /**
+     * Get brightness modifier based on intensity level
+     */
+    private function get_brightness_modifier($intensity) {
+        switch ($intensity) {
+            case 'extreme': return 1.5;
+            case 'high': return 1.2;
+            case 'light': return 0.7;
+            case 'minimal': return 0.4;
+            default: return 1.0;
+        }
+    }
+    
+    /**
+     * Add intelligent snow effect with variable intensity
+     */
+    private function add_intelligent_snow_effect($image_resource, $width, $height, $intensity) {
+        $snow_count = $this->get_particle_count($intensity, 400);
+        $opacity_base = $this->get_opacity_base($intensity, 80);
+        
+        $heavy_snow = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($heavy_snow, 0, 0, 0, 127);
+        imagefill($heavy_snow, 0, 0, $transparent);
+        imagesavealpha($heavy_snow, true);
+        
+        for ($i = 0; $i < $snow_count; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $size = rand(1, 8);
+            $alpha_variation = rand((int)($opacity_base * 0.7), (int)($opacity_base * 1.3));
+            
+            $color = imagecolorallocatealpha($heavy_snow, 255, 255, 255, $alpha_variation);
+            imagefilledellipse($heavy_snow, $x, $y, $size, $size, $color);
+        }
+        
+        // Ground snow based on intensity
+        $ground_height = $intensity === 'extreme' ? $height / 1.5 : ($intensity === 'light' ? $height / 4 : $height / 2);
+        $ground_snow = imagecreatetruecolor($width, (int)$ground_height);
+        
+        for ($y = 0; $y < $ground_height; $y++) {
+            $alpha_ratio = $y / $ground_height;
+            $alpha = 127 - (60 * $alpha_ratio * $this->get_color_intensity_modifier($intensity));
+            
+            for ($x = 0; $x < $width; $x += 2) {
+                $snow_color = imagecolorallocatealpha($ground_snow, 250, 250, 255, (int)$alpha);
+                imagesetpixel($ground_snow, $x, $y, $snow_color);
+            }
+        }
+        
+        imagealphablending($image_resource, true);
+        imagecopymerge($image_resource, $ground_snow, 0, $height - (int)$ground_height, 0, 0, $width, (int)$ground_height, 35);
+        imagecopymerge($image_resource, $heavy_snow, 0, 0, 0, 0, $width, $height, $opacity_base);
+        
+        imagedestroy($heavy_snow);
+        imagedestroy($ground_snow);
+    }
+    
+    /**
+     * Add intelligent rain effect with variable intensity
+     */
+    private function add_intelligent_rain_effect($image_resource, $width, $height, $intensity) {
+        $rain_count = $this->get_particle_count($intensity, 250);
+        $opacity_base = $this->get_opacity_base($intensity, 70);
+        
+        $rain_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($rain_overlay, 0, 0, 0, 127);
+        imagefill($rain_overlay, 0, 0, $transparent);
+        imagesavealpha($rain_overlay, true);
+        
+        // Rain lines based on intensity
+        for ($i = 0; $i < $rain_count; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $length = $intensity === 'extreme' ? rand(30, 50) : ($intensity === 'light' ? rand(8, 15) : rand(20, 35));
+            $thickness = $intensity === 'extreme' ? rand(2, 4) : ($intensity === 'light' ? 1 : rand(1, 3));
+            
+            $rain_color = imagecolorallocatealpha($rain_overlay, 200, 210, 240, rand((int)($opacity_base * 0.8), (int)($opacity_base * 1.2)));
+            imagesetthickness($rain_overlay, $thickness);
+            imageline($rain_overlay, $x, $y, $x - ($intensity === 'extreme' ? 6 : 4), $y + $length, $rain_color);
+        }
+        
+        imagealphablending($image_resource, true);
+        imagecopymerge($image_resource, $rain_overlay, 0, 0, 0, 0, $width, $height, $opacity_base);
+        
+        imagedestroy($rain_overlay);
+    }
+    
+    /**
+     * Add intelligent sunset effect with variable intensity
+     */
+    private function add_intelligent_sunset_effect($image_resource, $width, $height, $intensity) {
+        if ($intensity === 'minimal' || $intensity === 'light') return; // Subtle sunset is just color adjustment
+        
+        $rays_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($rays_overlay, 0, 0, 0, 127);
+        imagefill($rays_overlay, 0, 0, $transparent);
+        imagesavealpha($rays_overlay, true);
+        
+        $ray_count = $intensity === 'extreme' ? 12 : 8;
+        $ray_opacity = $intensity === 'extreme' ? 90 : 110;
+        
+        $ray_source_x = $width / 2;
+        $ray_source_y = 0;
+        
+        for ($i = 0; $i < $ray_count; $i++) {
+            $angle = ($i * (360 / $ray_count)) - 120;
+            $ray_length = $height * 1.2;
+            $end_x = $ray_source_x + cos(deg2rad($angle)) * $ray_length;
+            $end_y = $ray_source_y + sin(deg2rad($angle)) * $ray_length;
+            
+            $ray_color = imagecolorallocatealpha($rays_overlay, 255, 220, 150, $ray_opacity);
+            imagesetthickness($rays_overlay, $intensity === 'extreme' ? 12 : 8);
+            imageline($rays_overlay, (int)$ray_source_x, (int)$ray_source_y, (int)$end_x, (int)$end_y, $ray_color);
+        }
+        
+        imagecopymerge($image_resource, $rays_overlay, 0, 0, 0, 0, $width, $height, 25);
+        imagedestroy($rays_overlay);
+    }
+    
+    /**
+     * Add intelligent night effect with variable intensity
+     */
+    private function add_intelligent_night_effect($image_resource, $width, $height, $intensity) {
+        if ($intensity === 'minimal') return; // Minimal night is just color adjustment
+        
+        $stars_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($stars_overlay, 0, 0, 0, 127);
+        imagefill($stars_overlay, 0, 0, $transparent);
+        imagesavealpha($stars_overlay, true);
+        
+        $star_count = $this->get_particle_count($intensity, 30);
+        $star_area = $height / 2;
+        
+        for ($i = 0; $i < $star_count; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $star_area);
+            $size = rand(1, $intensity === 'extreme' ? 4 : 3);
+            
+            $star_color = imagecolorallocatealpha($stars_overlay, 255, 255, 200, 80);
+            imagefilledellipse($stars_overlay, $x, $y, $size, $size, $star_color);
+        }
+        
+        // Moon based on intensity
+        if ($intensity !== 'light') {
+            $moon_x = $width * 0.8;
+            $moon_y = $height * 0.2;
+            $moon_size = $intensity === 'extreme' ? 60 : 40;
+            $moon_color = imagecolorallocatealpha($stars_overlay, 240, 240, 200, 70);
+            imagefilledellipse($stars_overlay, (int)$moon_x, (int)$moon_y, $moon_size, $moon_size, $moon_color);
+        }
+        
+        imagecopymerge($image_resource, $stars_overlay, 0, 0, 0, 0, $width, $height, 60);
+        imagedestroy($stars_overlay);
+    }
+    
+    /**
+     * Add intelligent autumn effect with variable intensity
+     */
+    private function add_intelligent_autumn_effect($image_resource, $width, $height, $intensity) {
+        if ($intensity === 'minimal') return;
+        
+        $leaves_count = $this->get_particle_count($intensity, 50);
+        
+        $leaves_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($leaves_overlay, 0, 0, 0, 127);
+        imagefill($leaves_overlay, 0, 0, $transparent);
+        imagesavealpha($leaves_overlay, true);
+        
+        $leaf_colors = array(
+            array(180, 100, 50),
+            array(200, 150, 50),
+            array(220, 180, 100),
+            array(150, 80, 40)
+        );
+        
+        for ($i = 0; $i < $leaves_count; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $size = rand(3, $intensity === 'extreme' ? 12 : 8);
+            
+            $color_index = array_rand($leaf_colors);
+            $color = $leaf_colors[$color_index];
+            $leaf_color = imagecolorallocatealpha($leaves_overlay, $color[0], $color[1], $color[2], 90);
+            imagefilledellipse($leaves_overlay, $x, $y, $size, $size + 2, $leaf_color);
+        }
+        
+        imagecopymerge($image_resource, $leaves_overlay, 0, 0, 0, 0, $width, $height, 50);
+        imagedestroy($leaves_overlay);
+    }
+    
+    /**
+     * Add intelligent spring effect with variable intensity
+     */
+    private function add_intelligent_spring_effect($image_resource, $width, $height, $intensity) {
+        if ($intensity === 'minimal') return;
+        
+        $petal_count = $this->get_particle_count($intensity, 30);
+        
+        $petals_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($petals_overlay, 0, 0, 0, 127);
+        imagefill($petals_overlay, 0, 0, $transparent);
+        imagesavealpha($petals_overlay, true);
+        
+        for ($i = 0; $i < $petal_count; $i++) {
+            $x = rand(0, $width);
+            $y = rand(0, $height);
+            $size = rand(2, $intensity === 'extreme' ? 8 : 6);
+            
+            $petal_colors = array(
+                array(255, 200, 220),
+                array(255, 220, 240),
+                array(240, 255, 240)
+            );
+            
+            $color_index = array_rand($petal_colors);
+            $color = $petal_colors[$color_index];
+            $petal_color = imagecolorallocatealpha($petals_overlay, $color[0], $color[1], $color[2], 100);
+            imagefilledellipse($petals_overlay, $x, $y, $size, $size, $petal_color);
+        }
+        
+        imagecopymerge($image_resource, $petals_overlay, 0, 0, 0, 0, $width, $height, 40);
+        imagedestroy($petals_overlay);
+    }
+    
+    /**
+     * Add intelligent summer effect with variable intensity
+     */
+    private function add_intelligent_summer_effect($image_resource, $width, $height, $intensity) {
+        if ($intensity === 'minimal' || $intensity === 'light') return;
+        
+        $sun_overlay = imagecreatetruecolor($width, $height);
+        $transparent = imagecolorallocatealpha($sun_overlay, 0, 0, 0, 127);
+        imagefill($sun_overlay, 0, 0, $transparent);
+        imagesavealpha($sun_overlay, true);
+        
+        $sun_x = $width * 0.8;
+        $sun_y = $height * 0.15;
+        $sun_size = $intensity === 'extreme' ? 80 : 60;
+        $sun_color = imagecolorallocatealpha($sun_overlay, 255, 240, 150, 85);
+        imagefilledellipse($sun_overlay, (int)$sun_x, (int)$sun_y, $sun_size, $sun_size, $sun_color);
+        
+        // Sun rays
+        $ray_count = $intensity === 'extreme' ? 16 : 12;
+        for ($i = 0; $i < $ray_count; $i++) {
+            $angle = $i * (360 / $ray_count);
+            $ray_length = $intensity === 'extreme' ? 100 : 80;
+            $end_x = $sun_x + cos(deg2rad($angle)) * $ray_length;
+            $end_y = $sun_y + sin(deg2rad($angle)) * $ray_length;
+            
+            $ray_color = imagecolorallocatealpha($sun_overlay, 255, 235, 120, 100);
+            imagesetthickness($sun_overlay, $intensity === 'extreme' ? 6 : 4);
+            imageline($sun_overlay, (int)$sun_x, (int)$sun_y, (int)$end_x, (int)$end_y, $ray_color);
+        }
+        
+        imagecopymerge($image_resource, $sun_overlay, 0, 0, 0, 0, $width, $height, 35);
+        imagedestroy($sun_overlay);
+    }
+    
+    /**
+     * Get particle count based on intensity
+     */
+    private function get_particle_count($intensity, $base_count) {
+        $multiplier = $this->get_color_intensity_modifier($intensity);
+        return (int)($base_count * $multiplier);
+    }
+    
+    /**
+     * Get opacity base value based on intensity
+     */
+    private function get_opacity_base($intensity, $base_opacity) {
+        switch ($intensity) {
+            case 'extreme': return (int)($base_opacity * 0.6); // More opaque for extreme
+            case 'high': return (int)($base_opacity * 0.8);
+            case 'light': return (int)($base_opacity * 1.3); // More transparent for light
+            case 'minimal': return (int)($base_opacity * 1.5);
+            default: return $base_opacity;
+        }
+    }
+    
+    /**
+     * Create location-based background overlay
+     */
+    private function create_location_background_overlay($image_resource, $location, $width, $height) {
+        switch ($location) {
+            case 'beach':
+                $this->create_beach_background_overlay($image_resource, $width, $height);
+                break;
+            case 'forest':
+                $this->create_forest_background_overlay($image_resource, $width, $height);
+                break;
+            case 'mountains':
+                $this->create_mountain_background_overlay($image_resource, $width, $height);
+                break;
+            case 'urban':
+                $this->create_urban_background_overlay($image_resource, $width, $height);
+                break;
+            case 'desert':
+                $this->create_desert_background_overlay($image_resource, $width, $height);
+                break;
+            case 'field':
+                $this->create_field_background_overlay($image_resource, $width, $height);
+                break;
+        }
+    }
+    
+    /**
+     * Create beach background overlay
+     */
+    private function create_beach_background_overlay($image_resource, $width, $height) {
+        $beach_bg = imagecreatetruecolor($width, $height);
+        
+        // Beach colors (sky blue to sandy)
+        $top_color = array(135, 206, 235);    // Sky blue
+        $middle_color = array(173, 216, 230); // Light blue
+        $bottom_color = array(238, 203, 173); // Sandy color
+        
+        for ($y = 0; $y < $height; $y++) {
+            $ratio = $y / $height;
+            
+            if ($ratio < 0.7) {
+                $blend_ratio = $ratio / 0.7;
+                $r = $top_color[0] + ($middle_color[0] - $top_color[0]) * $blend_ratio;
+                $g = $top_color[1] + ($middle_color[1] - $top_color[1]) * $blend_ratio;
+                $b = $top_color[2] + ($middle_color[2] - $top_color[2]) * $blend_ratio;
+            } else {
+                $blend_ratio = ($ratio - 0.7) / 0.3;
+                $r = $middle_color[0] + ($bottom_color[0] - $middle_color[0]) * $blend_ratio;
+                $g = $middle_color[1] + ($bottom_color[1] - $middle_color[1]) * $blend_ratio;
+                $b = $middle_color[2] + ($bottom_color[2] - $middle_color[2]) * $blend_ratio;
+            }
+            
+            $color = imagecolorallocate($beach_bg, (int)$r, (int)$g, (int)$b);
+            imageline($beach_bg, 0, $y, $width, $y, $color);
+        }
+        
+        imagecopymerge($image_resource, $beach_bg, 0, 0, 0, 0, $width, $height, 30);
+        imagedestroy($beach_bg);
+    }
+    
+    /**
+     * Create forest background overlay
+     */
+    private function create_forest_background_overlay($image_resource, $width, $height) {
+        $forest_bg = imagecreatetruecolor($width, $height);
+        
+        // Forest colors (dark green gradient)
+        $top_color = array(34, 139, 34);      // Forest green
+        $middle_color = array(50, 150, 50);   // Medium green
+        $bottom_color = array(85, 107, 47);   // Dark olive green
+        
+        for ($y = 0; $y < $height; $y++) {
+            $ratio = $y / $height;
+            
+            $r = $top_color[0] + ($bottom_color[0] - $top_color[0]) * $ratio;
+            $g = $top_color[1] + ($bottom_color[1] - $top_color[1]) * $ratio;
+            $b = $top_color[2] + ($bottom_color[2] - $top_color[2]) * $ratio;
+            
+            $color = imagecolorallocate($forest_bg, (int)$r, (int)$g, (int)$b);
+            imageline($forest_bg, 0, $y, $width, $y, $color);
+        }
+        
+        imagecopymerge($image_resource, $forest_bg, 0, 0, 0, 0, $width, $height, 35);
+        imagedestroy($forest_bg);
+    }
+    
+    /**
+     * Create mountain background overlay
+     */
+    private function create_mountain_background_overlay($image_resource, $width, $height) {
+        $mountain_bg = imagecreatetruecolor($width, $height);
+        
+        // Mountain colors (blue sky to gray mountains)
+        $top_color = array(135, 206, 250);    // Light sky blue
+        $middle_color = array(169, 169, 169); // Dark gray
+        $bottom_color = array(105, 105, 105); // Dim gray
+        
+        for ($y = 0; $y < $height; $y++) {
+            $ratio = $y / $height;
+            
+            if ($ratio < 0.4) {
+                $blend_ratio = $ratio / 0.4;
+                $r = $top_color[0] + ($middle_color[0] - $top_color[0]) * $blend_ratio;
+                $g = $top_color[1] + ($middle_color[1] - $top_color[1]) * $blend_ratio;
+                $b = $top_color[2] + ($middle_color[2] - $top_color[2]) * $blend_ratio;
+            } else {
+                $blend_ratio = ($ratio - 0.4) / 0.6;
+                $r = $middle_color[0] + ($bottom_color[0] - $middle_color[0]) * $blend_ratio;
+                $g = $middle_color[1] + ($bottom_color[1] - $middle_color[1]) * $blend_ratio;
+                $b = $middle_color[2] + ($bottom_color[2] - $middle_color[2]) * $blend_ratio;
+            }
+            
+            $color = imagecolorallocate($mountain_bg, (int)$r, (int)$g, (int)$b);
+            imageline($mountain_bg, 0, $y, $width, $y, $color);
+        }
+        
+        imagecopymerge($image_resource, $mountain_bg, 0, 0, 0, 0, $width, $height, 30);
+        imagedestroy($mountain_bg);
+    }
+    
+    /**
+     * Create urban background overlay
+     */
+    private function create_urban_background_overlay($image_resource, $width, $height) {
+        // Urban atmosphere - cooler, more neutral tones
+        imagefilter($image_resource, IMG_FILTER_COLORIZE, -5, -5, 10);
+        imagefilter($image_resource, IMG_FILTER_CONTRAST, 10);
+    }
+    
+    /**
+     * Create desert background overlay
+     */
+    private function create_desert_background_overlay($image_resource, $width, $height) {
+        $desert_bg = imagecreatetruecolor($width, $height);
+        
+        // Desert colors (blue sky to sandy desert)
+        $top_color = array(135, 206, 235);    // Sky blue
+        $middle_color = array(255, 218, 185); // Peach puff
+        $bottom_color = array(238, 203, 173); // Sandy brown
+        
+        for ($y = 0; $y < $height; $y++) {
+            $ratio = $y / $height;
+            
+            if ($ratio < 0.3) {
+                $blend_ratio = $ratio / 0.3;
+                $r = $top_color[0] + ($middle_color[0] - $top_color[0]) * $blend_ratio;
+                $g = $top_color[1] + ($middle_color[1] - $top_color[1]) * $blend_ratio;
+                $b = $top_color[2] + ($middle_color[2] - $top_color[2]) * $blend_ratio;
+            } else {
+                $blend_ratio = ($ratio - 0.3) / 0.7;
+                $r = $middle_color[0] + ($bottom_color[0] - $middle_color[0]) * $blend_ratio;
+                $g = $middle_color[1] + ($bottom_color[1] - $middle_color[1]) * $blend_ratio;
+                $b = $middle_color[2] + ($bottom_color[2] - $middle_color[2]) * $blend_ratio;
+            }
+            
+            $color = imagecolorallocate($desert_bg, (int)$r, (int)$g, (int)$b);
+            imageline($desert_bg, 0, $y, $width, $y, $color);
+        }
+        
+        imagecopymerge($image_resource, $desert_bg, 0, 0, 0, 0, $width, $height, 25);
+        imagedestroy($desert_bg);
+    }
+    
+    /**
+     * Create field background overlay
+     */
+    private function create_field_background_overlay($image_resource, $width, $height) {
+        $field_bg = imagecreatetruecolor($width, $height);
+        
+        // Field colors (blue sky to green grass)
+        $top_color = array(135, 206, 250);    // Light sky blue
+        $middle_color = array(173, 216, 230); // Light blue
+        $bottom_color = array(124, 252, 0);   // Lawn green
+        
+        for ($y = 0; $y < $height; $y++) {
+            $ratio = $y / $height;
+            
+            if ($ratio < 0.6) {
+                $blend_ratio = $ratio / 0.6;
+                $r = $top_color[0] + ($middle_color[0] - $top_color[0]) * $blend_ratio;
+                $g = $top_color[1] + ($middle_color[1] - $top_color[1]) * $blend_ratio;
+                $b = $top_color[2] + ($middle_color[2] - $top_color[2]) * $blend_ratio;
+            } else {
+                $blend_ratio = ($ratio - 0.6) / 0.4;
+                $r = $middle_color[0] + ($bottom_color[0] - $middle_color[0]) * $blend_ratio;
+                $g = $middle_color[1] + ($bottom_color[1] - $middle_color[1]) * $blend_ratio;
+                $b = $middle_color[2] + ($bottom_color[2] - $middle_color[2]) * $blend_ratio;
+            }
+            
+            $color = imagecolorallocate($field_bg, (int)$r, (int)$g, (int)$b);
+            imageline($field_bg, 0, $y, $width, $y, $color);
+        }
+        
+        imagecopymerge($image_resource, $field_bg, 0, 0, 0, 0, $width, $height, 30);
+        imagedestroy($field_bg);
+    }
+    
+    /**
+     * Create intelligent winter background overlay with intensity
+     */
+    private function create_intelligent_winter_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $color_modifier = $this->get_color_intensity_modifier($intensity);
+        $this->create_winter_background_overlay($image_resource, $width, $height);
+        
+        // Apply additional intensity-based effects
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+        }
+    }
+    
+    /**
+     * Create intelligent stormy background overlay with intensity
+     */
+    private function create_intelligent_stormy_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $this->create_stormy_background_overlay($image_resource, $width, $height);
+        
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -10);
+            imagefilter($image_resource, IMG_FILTER_CONTRAST, 5);
+        }
+    }
+    
+    /**
+     * Create intelligent sunset background overlay with intensity
+     */
+    private function create_intelligent_sunset_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $this->create_sunset_background_overlay($image_resource, $width, $height);
+        
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_COLORIZE, 10, 5, -15);
+        }
+    }
+    
+    /**
+     * Create intelligent night background overlay with intensity
+     */
+    private function create_intelligent_night_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $this->create_night_background_overlay($image_resource, $width, $height);
+        
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, -15);
+        }
+    }
+    
+    /**
+     * Create intelligent autumn background overlay with intensity
+     */
+    private function create_intelligent_autumn_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $this->create_autumn_background_overlay($image_resource, $width, $height);
+        
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_COLORIZE, 15, 5, -10);
+        }
+    }
+    
+    /**
+     * Create intelligent spring background overlay with intensity
+     */
+    private function create_intelligent_spring_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $this->create_spring_background_overlay($image_resource, $width, $height);
+        
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 8);
+        }
+    }
+    
+    /**
+     * Create intelligent summer background overlay with intensity
+     */
+    private function create_intelligent_summer_background_overlay($image_resource, $width, $height, $intensity = 'medium') {
+        $this->create_summer_background_overlay($image_resource, $width, $height);
+        
+        if ($intensity === 'extreme') {
+            imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 12);
+            imagefilter($image_resource, IMG_FILTER_CONTRAST, 5);
         }
     }
     
