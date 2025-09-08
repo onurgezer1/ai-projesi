@@ -1021,7 +1021,6 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         
         return isset($creative_effects[$type]) ? $creative_effects[$type] : array();
     }
-    }
 
     /**
      * Create intelligent and comprehensive prompt for DALL-E based on image analysis and user instructions
