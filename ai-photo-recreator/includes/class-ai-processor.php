@@ -286,7 +286,7 @@ class AI_Photo_Processor {
     }
     
     /**
-     * Process image with OpenAI - Vision + DALL-E pipeline
+     * Process image with OpenAI - Enhanced Vision + DALL-E pipeline with local analysis integration
      * 
      * @param string $file_path Original file path
      * @param string $instructions User instructions
@@ -295,7 +295,12 @@ class AI_Photo_Processor {
      */
     private function process_with_openai($file_path, $instructions, $api_key) {
         try {
-            // Step 1: Read and prepare the image
+            error_log('AI Photo Recreator: Starting enhanced OpenAI processing with comprehensive analysis');
+            
+            // Step 1: Perform local image analysis as backup and enhancement
+            $local_analysis = $this->analyze_uploaded_image($file_path);
+            
+            // Step 2: Read and prepare the image for OpenAI
             $image_data = file_get_contents($file_path);
             if (!$image_data) {
                 return array(
@@ -309,8 +314,9 @@ class AI_Photo_Processor {
             $image_info = getimagesize($file_path);
             $mime_type = $image_info['mime'];
             
-            // Step 2: Analyze the image using GPT-4V to understand its content
-            $vision_result = $this->analyze_image_with_vision($base64_image, $api_key, $mime_type);
+            // Step 3: Enhanced image analysis using GPT-4V with structured prompts
+            error_log('AI Photo Recreator: Step 3 - Enhanced OpenAI Vision analysis');
+            $vision_result = $this->analyze_image_with_enhanced_vision($base64_image, $api_key, $mime_type, $instructions, $local_analysis);
             
             if (!$vision_result['success']) {
                 error_log('AI Photo Recreator: Vision analysis failed: ' . $vision_result['message']);
@@ -320,18 +326,32 @@ class AI_Photo_Processor {
                 );
             }
             
-            // Step 3: Create comprehensive prompt for DALL-E
-            $comprehensive_prompt = $this->create_transformation_prompt($vision_result['description'], $instructions);
+            error_log('AI Photo Recreator: Vision analysis successful - detected: ' . 
+                     (isset($vision_result['structured_analysis']['people_count']) ? $vision_result['structured_analysis']['people_count'] : 'unknown') . ' people, ' .
+                     (isset($vision_result['structured_analysis']['clothing_items']) ? count($vision_result['structured_analysis']['clothing_items']) : 0) . ' clothing items');
             
-            error_log('AI Photo Recreator: Generated DALL-E prompt: ' . $comprehensive_prompt);
+            // Step 4: Create highly sophisticated prompt for DALL-E with comprehensive context
+            $comprehensive_prompt = $this->create_enhanced_transformation_prompt(
+                $vision_result['description'], 
+                $vision_result['structured_analysis'] ?? array(),
+                $instructions,
+                $local_analysis
+            );
             
-            // Step 4: Generate new image with DALL-E
+            error_log('AI Photo Recreator: Generated enhanced DALL-E prompt (length: ' . strlen($comprehensive_prompt) . ')');
+            
+            // Step 5: Generate new image with DALL-E using enhanced prompt
             $dalle_result = $this->generate_image_with_dalle($comprehensive_prompt, $api_key);
             
             if ($dalle_result['success']) {
                 return array(
                     'success' => true,
-                    'image_data' => $dalle_result['image_data']
+                    'image_data' => $dalle_result['image_data'],
+                    'analysis_details' => array(
+                        'local_analysis' => $local_analysis,
+                        'openai_analysis' => $vision_result['structured_analysis'] ?? array(),
+                        'prompt_used' => $comprehensive_prompt
+                    )
                 );
             } else {
                 return array(
@@ -341,7 +361,7 @@ class AI_Photo_Processor {
             }
             
         } catch (Exception $e) {
-            error_log('AI Photo Recreator OpenAI Error: ' . $e->getMessage());
+            error_log('AI Photo Recreator Enhanced OpenAI Error: ' . $e->getMessage());
             return array(
                 'success' => false,
                 'message' => __('OpenAI processing error', 'ai-photo-recreator')
@@ -456,6 +476,276 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                 'message' => __('Failed to analyze image with Vision API', 'ai-photo-recreator')
             );
         }
+    }
+    
+    /**
+     * Enhanced image analysis using GPT-4V with structured prompts and local analysis integration
+     * 
+     * @param string $base64_image Base64 encoded image
+     * @param string $api_key OpenAI API key
+     * @param string $mime_type Image MIME type
+     * @param string $instructions User instructions for context
+     * @param array $local_analysis Local image analysis results
+     * @return array Analysis result with structured data
+     */
+    private function analyze_image_with_enhanced_vision($base64_image, $api_key, $mime_type, $instructions, $local_analysis) {
+        try {
+            $api_url = 'https://api.openai.com/v1/chat/completions';
+            
+            $headers = array(
+                'Authorization' => 'Bearer ' . $api_key,
+                'Content-Type' => 'application/json'
+            );
+            
+            // Create enhanced analysis prompt with user context and local analysis
+            $analysis_prompt = $this->create_enhanced_vision_prompt($instructions, $local_analysis);
+            
+            $body = array(
+                'model' => 'gpt-4o',
+                'messages' => array(
+                    array(
+                        'role' => 'user',
+                        'content' => array(
+                            array(
+                                'type' => 'text',
+                                'text' => $analysis_prompt
+                            ),
+                            array(
+                                'type' => 'image_url',
+                                'image_url' => array(
+                                    'url' => 'data:' . $mime_type . ';base64,' . $base64_image
+                                )
+                            )
+                        )
+                    )
+                ),
+                'max_tokens' => 1500
+            );
+            
+            $args = array(
+                'timeout' => 60,
+                'headers' => $headers,
+                'body' => json_encode($body),
+                'method' => 'POST'
+            );
+            
+            $response = wp_remote_request($api_url, $args);
+            
+            if (is_wp_error($response)) {
+                error_log('AI Photo Recreator Enhanced Vision API: WP Error - ' . $response->get_error_message());
+                return array(
+                    'success' => false,
+                    'message' => $response->get_error_message()
+                );
+            }
+            
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            
+            error_log('AI Photo Recreator Enhanced Vision API: Response Code - ' . $response_code);
+            
+            if ($response_code !== 200) {
+                $error_data = json_decode($response_body, true);
+                $error_message = isset($error_data['error']['message']) ? $error_data['error']['message'] : 'Unknown API error';
+                
+                error_log('AI Photo Recreator Enhanced Vision API: Error - ' . $error_message);
+                error_log('AI Photo Recreator Enhanced Vision API: Full response - ' . $response_body);
+                
+                return array(
+                    'success' => false,
+                    'message' => sprintf(__('Vision API error (%d): %s', 'ai-photo-recreator'), $response_code, $error_message)
+                );
+            }
+            
+            $data = json_decode($response_body, true);
+            
+            if (!isset($data['choices'][0]['message']['content'])) {
+                return array(
+                    'success' => false,
+                    'message' => __('Invalid response from Enhanced Vision API', 'ai-photo-recreator')
+                );
+            }
+            
+            $description = $data['choices'][0]['message']['content'];
+            
+            // Parse structured analysis from response
+            $structured_analysis = $this->parse_vision_structured_response($description);
+            
+            return array(
+                'success' => true,
+                'description' => $description,
+                'structured_analysis' => $structured_analysis
+            );
+            
+        } catch (Exception $e) {
+            error_log('AI Photo Recreator Enhanced Vision API Error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => __('Failed to analyze image with Enhanced Vision API', 'ai-photo-recreator')
+            );
+        }
+    }
+    
+    /**
+     * Create enhanced vision analysis prompt with user context
+     */
+    private function create_enhanced_vision_prompt($instructions, $local_analysis) {
+        $prompt = "Analyze this image in extreme detail with focus on the user's specific request: \"$instructions\"\n\n";
+        
+        $prompt .= "COMPREHENSIVE ANALYSIS REQUIRED:\n\n";
+        
+        $prompt .= "1. PEOPLE ANALYSIS:\n";
+        $prompt .= "- Count and describe each person (gender, age estimate, pose, expression)\n";
+        $prompt .= "- Detailed clothing description for each person (shirts, pants, dresses, jackets, shoes, accessories)\n";
+        $prompt .= "- Exact colors of each clothing item\n";
+        $prompt .= "- Body positioning and poses\n\n";
+        
+        $prompt .= "2. CLOTHING FOCUS (CRITICAL FOR USER REQUEST):\n";
+        $prompt .= "- Identify EXACTLY what clothing items are visible\n";
+        $prompt .= "- Describe the EXACT colors of shirts/gömlek, pants/pantolon, etc.\n";
+        $prompt .= "- Note clothing styles, patterns, textures\n";
+        $prompt .= "- Specify which person is wearing what\n\n";
+        
+        $prompt .= "3. COLOR ANALYSIS:\n";
+        $prompt .= "- List ALL dominant colors in the image\n";
+        $prompt .= "- Specify colors of clothing items separately\n";
+        $prompt .= "- Background colors and lighting\n\n";
+        
+        $prompt .= "4. SCENE DETAILS:\n";
+        $prompt .= "- Location/setting description\n";
+        $prompt .= "- Lighting conditions (indoor/outdoor, time of day)\n";
+        $prompt .= "- Background elements\n";
+        $prompt .= "- Overall atmosphere and mood\n\n";
+        
+        $prompt .= "5. CONTEXT FOR TRANSFORMATION:\n";
+        $prompt .= "- Based on the request \"$instructions\", identify what needs to be changed\n";
+        $prompt .= "- Specify the target elements (which person, which clothing item)\n";
+        $prompt .= "- Note any challenges for the requested transformation\n\n";
+        
+        // Add local analysis context if available
+        if ($local_analysis['success'] ?? false) {
+            $prompt .= "6. LOCAL ANALYSIS CONFIRMATION:\n";
+            $prompt .= "- Local analysis detected " . ($local_analysis['people_count'] ?? 0) . " people\n";
+            $prompt .= "- Dominant local colors: " . implode(', ', array_column($local_analysis['dominant_colors'] ?? array(), 'color_name')) . "\n";
+            $prompt .= "- Please confirm or correct this analysis\n\n";
+        }
+        
+        $prompt .= "RESPONSE FORMAT:\n";
+        $prompt .= "Provide detailed description followed by:\n";
+        $prompt .= "STRUCTURED_DATA:\n";
+        $prompt .= "People: [count]\n";
+        $prompt .= "Person1_Clothing: [detailed list with colors]\n";
+        $prompt .= "Person2_Clothing: [if applicable]\n";
+        $prompt .= "Target_Element: [what user wants to change based on request]\n";
+        $prompt .= "Feasibility: [how feasible is the requested change]\n";
+        
+        return $prompt;
+    }
+    
+    /**
+     * Parse structured response from enhanced vision analysis
+     */
+    private function parse_vision_structured_response($description) {
+        $structured = array();
+        
+        // Extract structured data section
+        if (preg_match('/STRUCTURED_DATA:\s*(.*?)$/s', $description, $matches)) {
+            $data_section = $matches[1];
+            
+            // Parse each line
+            $lines = explode("\n", $data_section);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line)) continue;
+                
+                if (preg_match('/People:\s*(\d+)/', $line, $m)) {
+                    $structured['people_count'] = (int)$m[1];
+                } elseif (preg_match('/Person(\d+)_Clothing:\s*(.+)/', $line, $m)) {
+                    $structured['people'][$m[1]]['clothing'] = trim($m[2]);
+                } elseif (preg_match('/Target_Element:\s*(.+)/', $line, $m)) {
+                    $structured['target_element'] = trim($m[2]);
+                } elseif (preg_match('/Feasibility:\s*(.+)/', $line, $m)) {
+                    $structured['feasibility'] = trim($m[2]);
+                }
+            }
+        }
+        
+        // Extract clothing items mentioned in description
+        $clothing_items = array();
+        $clothing_patterns = array(
+            'shirt' => '/(?:shirt|gömlek)/i',
+            'pants' => '/(?:pants|pantolon|trousers)/i',
+            'dress' => '/(?:dress|elbise)/i',
+            'jacket' => '/(?:jacket|ceket|coat)/i'
+        );
+        
+        foreach ($clothing_patterns as $item => $pattern) {
+            if (preg_match($pattern, $description)) {
+                $clothing_items[] = $item;
+            }
+        }
+        
+        $structured['clothing_items'] = $clothing_items;
+        
+        return $structured;
+    }
+    
+    /**
+     * Create enhanced transformation prompt with comprehensive analysis
+     */
+    private function create_enhanced_transformation_prompt($vision_description, $structured_analysis, $instructions, $local_analysis) {
+        $prompt = "Create a photorealistic image that precisely recreates this scene with the requested modification.\n\n";
+        
+        $prompt .= "ORIGINAL SCENE ANALYSIS:\n";
+        $prompt .= $vision_description . "\n\n";
+        
+        $prompt .= "USER REQUEST: \"$instructions\"\n\n";
+        
+        $prompt .= "TRANSFORMATION REQUIREMENTS:\n";
+        
+        // Add specific instructions based on structured analysis
+        if (isset($structured_analysis['target_element'])) {
+            $prompt .= "PRIMARY FOCUS: " . $structured_analysis['target_element'] . "\n";
+        }
+        
+        // Enhanced clothing transformation instructions
+        if (strpos(strtolower($instructions), 'gömlek') !== false || strpos(strtolower($instructions), 'shirt') !== false) {
+            $prompt .= "CLOTHING TRANSFORMATION:\n";
+            $prompt .= "- Identify the shirt/gömlek in the image\n";
+            $prompt .= "- Change ONLY the shirt color as requested\n";
+            $prompt .= "- Preserve all other elements: person, pose, background, other clothing\n";
+            $prompt .= "- Maintain fabric texture and realistic lighting on the shirt\n";
+            $prompt .= "- Ensure the new color looks natural and realistic\n\n";
+        }
+        
+        // Color-specific instructions
+        if (preg_match('/["\']([^"\']+)["\']/', $instructions, $color_matches)) {
+            $requested_color = $color_matches[1];
+            $prompt .= "COLOR SPECIFICATION:\n";
+            $prompt .= "- Target color: $requested_color\n";
+            $prompt .= "- Apply this exact color with appropriate shading and highlights\n";
+            $prompt .= "- Maintain realistic fabric appearance\n\n";
+        }
+        
+        $prompt .= "CRITICAL PRESERVATION REQUIREMENTS:\n";
+        $prompt .= "- EXACTLY preserve all people: faces, expressions, poses, body positions\n";
+        $prompt .= "- EXACTLY preserve scene composition and camera angle\n";
+        $prompt .= "- EXACTLY preserve background and environment\n";
+        $prompt .= "- EXACTLY preserve lighting conditions and atmosphere\n";
+        $prompt .= "- ONLY change the specifically requested element\n\n";
+        
+        $prompt .= "QUALITY REQUIREMENTS:\n";
+        $prompt .= "- Photorealistic quality matching the original\n";
+        $prompt .= "- Natural lighting and shadows on modified elements\n";
+        $prompt .= "- Seamless integration of changes\n";
+        $prompt .= "- High resolution and sharp details\n\n";
+        
+        $prompt .= "CONTEXT AWARENESS:\n";
+        $prompt .= "- This is a specific, targeted modification request\n";
+        $prompt .= "- Focus on precision and accuracy of the requested change\n";
+        $prompt .= "- Maintain photographic realism throughout\n";
+        
+        return $prompt;
     }
     
     /**
@@ -1480,9 +1770,45 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
      * @param string $instructions User instructions
      * @return bool Success status
      */
+    /**
+     * Advanced intelligent local transformation with comprehensive image analysis
+     * Enhanced with image understanding before applying transformations
+     * 
+     * @param string $original_path Original file path
+     * @param string $processed_path Path where processed file will be saved
+     * @param string $instructions User instructions
+     * @return bool Success status
+     */
     private function create_advanced_transformation($original_path, $processed_path, $instructions) {
         try {
-            // Get image info
+            error_log('AI Photo Recreator: Starting advanced local transformation with comprehensive image analysis');
+            
+            // Phase 1: Comprehensive image analysis - Understand what's in the photo
+            error_log('AI Photo Recreator: Phase 1 - Analyzing uploaded image content');
+            $image_analysis = $this->analyze_uploaded_image($original_path);
+            
+            if (!$image_analysis['success']) {
+                error_log('AI Photo Recreator: Image analysis failed: ' . $image_analysis['message']);
+                return false;
+            }
+            
+            error_log('AI Photo Recreator: Image analysis completed - Detected: ' . 
+                     'People: ' . ($image_analysis['people_count'] ?? 0) . 
+                     ', Clothing items: ' . count($image_analysis['clothing_items'] ?? array()) . 
+                     ', Dominant colors: ' . count($image_analysis['dominant_colors'] ?? array()));
+            
+            // Phase 2: Advanced intelligent instruction parsing with deep semantic understanding
+            error_log('AI Photo Recreator: Phase 2 - Parsing transformation instructions');
+            $transformations = $this->parse_transformation_instructions($instructions);
+            error_log('AI Photo Recreator: Instruction analysis completed - Intent: ' . ($transformations['primary_intent'] ?? 'unknown') . 
+                     ', Scope: ' . ($transformations['transformation_scope'] ?? 'unknown') . 
+                     ', Language: ' . ($transformations['language'] ?? 'unknown'));
+            
+            // Phase 3: Intelligent transformation planning - Match instructions with image content
+            error_log('AI Photo Recreator: Phase 3 - Creating intelligent transformation plan');
+            $transformation_plan = $this->create_intelligent_transformation_plan($image_analysis, $transformations, $instructions);
+            
+            // Phase 4: Get image info and create resource
             $image_info = getimagesize($original_path);
             if (!$image_info) {
                 error_log('AI Photo Recreator: Failed to get image info for ' . $original_path);
@@ -1520,16 +1846,11 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                 return false;
             }
             
-            // Parse instructions using advanced AI intelligence
-            $transformations = $this->parse_transformation_instructions($instructions);
+            // Phase 5: Apply comprehensive intelligent transformations with image understanding
+            error_log('AI Photo Recreator: Phase 5 - Applying intelligent transformations with image-aware processing');
+            $this->apply_comprehensive_intelligent_transformations($source, $transformations, $image_analysis, $transformation_plan, $width, $height);
             
-            error_log('AI Photo Recreator Local Processing: Applying intelligent transformations based on advanced analysis');
-            error_log('AI Photo Recreator Transformations: ' . json_encode($transformations, JSON_UNESCAPED_UNICODE));
-            
-            // Apply sophisticated transformations with intelligent analysis
-            $this->apply_intelligent_advanced_transformations($source, $transformations, $width, $height);
-            
-            // Save processed image
+            // Phase 6: Save processed image
             $result = false;
             switch ($type) {
                 case IMAGETYPE_JPEG:
@@ -1553,6 +1874,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                 return false;
             }
             
+            error_log('AI Photo Recreator: Advanced transformation completed successfully with comprehensive image analysis');
             return true;
             
         } catch (Exception $e) {
@@ -5063,5 +5385,865 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         }
         
         return $transformations;
+    }
+    
+    // ====================================================================
+    // COMPREHENSIVE IMAGE ANALYSIS METHODS - Understanding Photo Content
+    // ====================================================================
+    
+    /**
+     * Comprehensive analysis of uploaded image to understand content before processing
+     * This is the key method that examines the photo in detail as requested by the user
+     * 
+     * @param string $image_path Path to the image file
+     * @return array Analysis results with detected elements
+     */
+    private function analyze_uploaded_image($image_path) {
+        try {
+            error_log('AI Photo Recreator: Starting comprehensive image analysis for: ' . basename($image_path));
+            
+            // Initialize analysis results
+            $analysis = array(
+                'success' => false,
+                'image_path' => $image_path,
+                'analysis_timestamp' => time(),
+                'message' => ''
+            );
+            
+            // Get image info
+            $image_info = getimagesize($image_path);
+            if (!$image_info) {
+                $analysis['message'] = 'Failed to read image file';
+                return $analysis;
+            }
+            
+            $width = $image_info[0];
+            $height = $image_info[1];
+            $type = $image_info[2];
+            
+            $analysis['image_dimensions'] = array(
+                'width' => $width,
+                'height' => $height,
+                'type' => $type
+            );
+            
+            // Create image resource for analysis
+            $image_resource = $this->create_image_resource_from_path($image_path, $type);
+            if (!$image_resource) {
+                $analysis['message'] = 'Failed to create image resource for analysis';
+                return $analysis;
+            }
+            
+            error_log('AI Photo Recreator: Image loaded successfully, starting detailed analysis...');
+            
+            // Perform comprehensive analysis
+            $analysis['dominant_colors'] = $this->analyze_image_colors($image_resource, $width, $height);
+            $analysis['color_distribution'] = $this->analyze_color_distribution($image_resource, $width, $height);
+            $analysis['brightness_analysis'] = $this->analyze_image_brightness($image_resource, $width, $height);
+            $analysis['people_detection'] = $this->detect_people_in_image($image_resource, $width, $height);
+            $analysis['clothing_items'] = $this->detect_clothing_areas($image_resource, $width, $height, $analysis['people_detection']);
+            $analysis['object_detection'] = $this->detect_objects_in_image($image_resource, $width, $height);
+            $analysis['scene_analysis'] = $this->analyze_image_scene($image_resource, $width, $height);
+            
+            // Count detected elements
+            $analysis['people_count'] = count($analysis['people_detection']['detected_people'] ?? array());
+            $analysis['clothing_count'] = count($analysis['clothing_items']['detected_areas'] ?? array());
+            
+            // Clean up
+            imagedestroy($image_resource);
+            
+            $analysis['success'] = true;
+            $analysis['message'] = sprintf(
+                'Image analysis completed successfully. Detected %d people, %d clothing areas, %d dominant colors',
+                $analysis['people_count'],
+                $analysis['clothing_count'],
+                count($analysis['dominant_colors'])
+            );
+            
+            error_log('AI Photo Recreator: ' . $analysis['message']);
+            
+            return $analysis;
+            
+        } catch (Exception $e) {
+            error_log('AI Photo Recreator: Exception in image analysis: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => 'Image analysis failed: ' . $e->getMessage()
+            );
+        }
+    }
+    
+    /**
+     * Create image resource from file path and type
+     */
+    private function create_image_resource_from_path($image_path, $type) {
+        switch ($type) {
+            case IMAGETYPE_JPEG:
+                return @imagecreatefromjpeg($image_path);
+            case IMAGETYPE_PNG:
+                return @imagecreatefrompng($image_path);
+            case IMAGETYPE_WEBP:
+                if (function_exists('imagecreatefromwebp')) {
+                    return @imagecreatefromwebp($image_path);
+                }
+                break;
+        }
+        return false;
+    }
+    
+    /**
+     * Analyze dominant colors in the image
+     */
+    private function analyze_image_colors($image_resource, $width, $height) {
+        $color_counts = array();
+        $sample_size = 10; // Sample every 10th pixel for performance
+        
+        for ($y = 0; $y < $height; $y += $sample_size) {
+            for ($x = 0; $x < $width; $x += $sample_size) {
+                $rgb = imagecolorat($image_resource, $x, $y);
+                $colors = imagecolorsforindex($image_resource, $rgb);
+                
+                // Group similar colors
+                $color_key = $this->group_similar_colors($colors['red'], $colors['green'], $colors['blue']);
+                
+                if (!isset($color_counts[$color_key])) {
+                    $color_counts[$color_key] = 0;
+                }
+                $color_counts[$color_key]++;
+            }
+        }
+        
+        // Sort by frequency and return top colors
+        arsort($color_counts);
+        
+        $dominant_colors = array();
+        $count = 0;
+        foreach ($color_counts as $color_key => $frequency) {
+            if ($count >= 10) break; // Top 10 colors
+            
+            list($r, $g, $b) = explode(',', $color_key);
+            $dominant_colors[] = array(
+                'rgb' => array('r' => (int)$r, 'g' => (int)$g, 'b' => (int)$b),
+                'hex' => sprintf('#%02x%02x%02x', $r, $g, $b),
+                'frequency' => $frequency,
+                'color_name' => $this->get_color_name($r, $g, $b)
+            );
+            $count++;
+        }
+        
+        return $dominant_colors;
+    }
+    
+    /**
+     * Group similar colors together
+     */
+    private function group_similar_colors($r, $g, $b) {
+        // Round to nearest 32 to group similar colors
+        $r = round($r / 32) * 32;
+        $g = round($g / 32) * 32;
+        $b = round($b / 32) * 32;
+        
+        return "$r,$g,$b";
+    }
+    
+    /**
+     * Get human-readable color name from RGB values
+     */
+    private function get_color_name($r, $g, $b) {
+        // Simple color naming based on RGB values
+        if ($r > 200 && $g > 200 && $b > 200) return 'white';
+        if ($r < 50 && $g < 50 && $b < 50) return 'black';
+        if ($r > $g + 50 && $r > $b + 50) return 'red';
+        if ($g > $r + 50 && $g > $b + 50) return 'green';
+        if ($b > $r + 50 && $b > $g + 50) return 'blue';
+        if ($r > 150 && $g > 150 && $b < 100) return 'yellow';
+        if ($r > 150 && $g < 100 && $b > 100) return 'purple';
+        if ($r > 150 && $g > 100 && $b < 100) return 'orange';
+        if ($r > 100 && $g > 100 && $b > 100) return 'gray';
+        if ($r > 139 && $g < 100 && $b < 100) return 'brown';
+        
+        return 'unknown';
+    }
+    
+    /**
+     * Analyze color distribution across image regions
+     */
+    private function analyze_color_distribution($image_resource, $width, $height) {
+        $regions = array(
+            'top' => array('y_start' => 0, 'y_end' => $height / 3),
+            'middle' => array('y_start' => $height / 3, 'y_end' => 2 * $height / 3),
+            'bottom' => array('y_start' => 2 * $height / 3, 'y_end' => $height)
+        );
+        
+        $distribution = array();
+        
+        foreach ($regions as $region_name => $bounds) {
+            $region_colors = array();
+            $sample_size = 15;
+            
+            for ($y = $bounds['y_start']; $y < $bounds['y_end']; $y += $sample_size) {
+                for ($x = 0; $x < $width; $x += $sample_size) {
+                    $rgb = imagecolorat($image_resource, $x, (int)$y);
+                    $colors = imagecolorsforindex($image_resource, $rgb);
+                    
+                    $color_name = $this->get_color_name($colors['red'], $colors['green'], $colors['blue']);
+                    if (!isset($region_colors[$color_name])) {
+                        $region_colors[$color_name] = 0;
+                    }
+                    $region_colors[$color_name]++;
+                }
+            }
+            
+            arsort($region_colors);
+            $distribution[$region_name] = array_slice($region_colors, 0, 5, true);
+        }
+        
+        return $distribution;
+    }
+    
+    /**
+     * Analyze brightness levels in the image
+     */
+    private function analyze_image_brightness($image_resource, $width, $height) {
+        $total_brightness = 0;
+        $pixel_count = 0;
+        $brightness_histogram = array_fill(0, 256, 0);
+        $sample_size = 8;
+        
+        for ($y = 0; $y < $height; $y += $sample_size) {
+            for ($x = 0; $x < $width; $x += $sample_size) {
+                $rgb = imagecolorat($image_resource, $x, $y);
+                $colors = imagecolorsforindex($image_resource, $rgb);
+                
+                // Calculate brightness (luminance)
+                $brightness = (int)(0.299 * $colors['red'] + 0.587 * $colors['green'] + 0.114 * $colors['blue']);
+                $total_brightness += $brightness;
+                $brightness_histogram[$brightness]++;
+                $pixel_count++;
+            }
+        }
+        
+        $average_brightness = $pixel_count > 0 ? $total_brightness / $pixel_count : 0;
+        
+        return array(
+            'average' => $average_brightness,
+            'category' => $average_brightness > 180 ? 'bright' : ($average_brightness > 80 ? 'medium' : 'dark'),
+            'histogram' => $brightness_histogram
+        );
+    }
+    
+    /**
+     * Detect people in the image using basic image processing
+     */
+    private function detect_people_in_image($image_resource, $width, $height) {
+        // Basic people detection using skin tone analysis and shape detection
+        $detected_people = array();
+        
+        // Analyze for skin tones in likely person areas (center and lower areas)
+        $person_areas = $this->detect_skin_tone_regions($image_resource, $width, $height);
+        
+        if (!empty($person_areas)) {
+            foreach ($person_areas as $index => $area) {
+                $detected_people[] = array(
+                    'id' => 'person_' . ($index + 1),
+                    'bounds' => $area,
+                    'confidence' => $area['confidence'] ?? 0.7,
+                    'estimated_clothing_area' => $this->estimate_clothing_area_from_person($area, $width, $height)
+                );
+            }
+        } else {
+            // Default assumption: image contains at least one person in center area
+            $detected_people[] = array(
+                'id' => 'person_assumed',
+                'bounds' => array(
+                    'x' => $width * 0.25,
+                    'y' => $height * 0.2,
+                    'width' => $width * 0.5,
+                    'height' => $height * 0.7
+                ),
+                'confidence' => 0.5,
+                'estimated_clothing_area' => array(
+                    'shirt_area' => array(
+                        'x' => $width * 0.3,
+                        'y' => $height * 0.35,
+                        'width' => $width * 0.4,
+                        'height' => $height * 0.3
+                    )
+                )
+            );
+        }
+        
+        return array(
+            'detection_method' => 'skin_tone_analysis',
+            'detected_people' => $detected_people,
+            'total_count' => count($detected_people)
+        );
+    }
+    
+    /**
+     * Detect skin tone regions in the image
+     */
+    private function detect_skin_tone_regions($image_resource, $width, $height) {
+        $skin_regions = array();
+        $sample_size = 8;
+        $skin_pixels = array();
+        
+        // Sample the image for skin-like colors
+        for ($y = 0; $y < $height; $y += $sample_size) {
+            for ($x = 0; $x < $width; $x += $sample_size) {
+                $rgb = imagecolorat($image_resource, $x, $y);
+                $colors = imagecolorsforindex($image_resource, $rgb);
+                
+                if ($this->is_skin_tone($colors['red'], $colors['green'], $colors['blue'])) {
+                    $skin_pixels[] = array('x' => $x, 'y' => $y);
+                }
+            }
+        }
+        
+        // Group skin pixels into regions
+        if (count($skin_pixels) > 10) {
+            // Find clusters of skin pixels
+            $clusters = $this->cluster_skin_pixels($skin_pixels, $width, $height);
+            
+            foreach ($clusters as $cluster) {
+                if (count($cluster) > 5) { // Minimum size for a person
+                    $bounds = $this->calculate_bounding_box($cluster);
+                    $skin_regions[] = array(
+                        'x' => $bounds['min_x'],
+                        'y' => $bounds['min_y'],
+                        'width' => $bounds['max_x'] - $bounds['min_x'],
+                        'height' => $bounds['max_y'] - $bounds['min_y'],
+                        'confidence' => min(count($cluster) / 20, 1.0) // Higher confidence for more skin pixels
+                    );
+                }
+            }
+        }
+        
+        return $skin_regions;
+    }
+    
+    /**
+     * Check if RGB values represent a skin tone
+     */
+    private function is_skin_tone($r, $g, $b) {
+        // Basic skin tone detection
+        return (
+            $r > 95 && $g > 40 && $b > 20 &&
+            max($r, $g, $b) - min($r, $g, $b) > 15 &&
+            abs($r - $g) > 15 && $r > $g && $r > $b
+        );
+    }
+    
+    /**
+     * Cluster skin pixels into regions
+     */
+    private function cluster_skin_pixels($skin_pixels, $width, $height) {
+        $clusters = array();
+        $visited = array();
+        $max_distance = max($width, $height) * 0.1; // 10% of image dimension
+        
+        foreach ($skin_pixels as $i => $pixel) {
+            if (isset($visited[$i])) continue;
+            
+            $cluster = array($pixel);
+            $visited[$i] = true;
+            
+            // Find nearby skin pixels
+            foreach ($skin_pixels as $j => $other_pixel) {
+                if ($i === $j || isset($visited[$j])) continue;
+                
+                $distance = sqrt(pow($pixel['x'] - $other_pixel['x'], 2) + pow($pixel['y'] - $other_pixel['y'], 2));
+                if ($distance < $max_distance) {
+                    $cluster[] = $other_pixel;
+                    $visited[$j] = true;
+                }
+            }
+            
+            $clusters[] = $cluster;
+        }
+        
+        return $clusters;
+    }
+    
+    /**
+     * Calculate bounding box for a cluster of pixels
+     */
+    private function calculate_bounding_box($pixels) {
+        $min_x = $min_y = PHP_INT_MAX;
+        $max_x = $max_y = PHP_INT_MIN;
+        
+        foreach ($pixels as $pixel) {
+            $min_x = min($min_x, $pixel['x']);
+            $max_x = max($max_x, $pixel['x']);
+            $min_y = min($min_y, $pixel['y']);
+            $max_y = max($max_y, $pixel['y']);
+        }
+        
+        return array(
+            'min_x' => $min_x,
+            'max_x' => $max_x,
+            'min_y' => $min_y,
+            'max_y' => $max_y
+        );
+    }
+    
+    /**
+     * Estimate clothing areas from detected person bounds
+     */
+    private function estimate_clothing_area_from_person($person_bounds, $image_width, $image_height) {
+        $x = $person_bounds['x'];
+        $y = $person_bounds['y'];
+        $width = $person_bounds['width'];
+        $height = $person_bounds['height'];
+        
+        // Estimate different clothing areas based on typical human proportions
+        return array(
+            'shirt_area' => array(
+                'x' => $x + $width * 0.1,
+                'y' => $y + $height * 0.25, // Start below head area
+                'width' => $width * 0.8,
+                'height' => $height * 0.4 // Upper body area
+            ),
+            'pants_area' => array(
+                'x' => $x + $width * 0.2,
+                'y' => $y + $height * 0.6, // Lower body
+                'width' => $width * 0.6,
+                'height' => $height * 0.3
+            ),
+            'full_clothing_area' => array(
+                'x' => $x + $width * 0.1,
+                'y' => $y + $height * 0.2,
+                'width' => $width * 0.8,
+                'height' => $height * 0.7
+            )
+        );
+    }
+    
+    /**
+     * Detect clothing areas in the image
+     */
+    private function detect_clothing_areas($image_resource, $width, $height, $people_detection) {
+        $clothing_areas = array();
+        
+        // Use people detection to focus on likely clothing areas
+        if (!empty($people_detection['detected_people'])) {
+            foreach ($people_detection['detected_people'] as $person) {
+                if (isset($person['estimated_clothing_area'])) {
+                    foreach ($person['estimated_clothing_area'] as $clothing_type => $area) {
+                        $color_analysis = $this->analyze_area_colors($image_resource, $area, $width, $height);
+                        
+                        $clothing_areas[] = array(
+                            'type' => $clothing_type,
+                            'bounds' => $area,
+                            'person_id' => $person['id'],
+                            'dominant_colors' => $color_analysis['dominant_colors'],
+                            'average_color' => $color_analysis['average_color'],
+                            'confidence' => 0.7
+                        );
+                    }
+                }
+            }
+        }
+        
+        return array(
+            'detection_method' => 'person_based_estimation',
+            'detected_areas' => $clothing_areas,
+            'total_areas' => count($clothing_areas)
+        );
+    }
+    
+    /**
+     * Analyze colors in a specific area of the image
+     */
+    private function analyze_area_colors($image_resource, $area, $image_width, $image_height) {
+        $x_start = max(0, (int)$area['x']);
+        $y_start = max(0, (int)$area['y']);
+        $x_end = min($image_width, $x_start + (int)$area['width']);
+        $y_end = min($image_height, $y_start + (int)$area['height']);
+        
+        $color_counts = array();
+        $total_r = $total_g = $total_b = 0;
+        $pixel_count = 0;
+        $sample_size = 3;
+        
+        for ($y = $y_start; $y < $y_end; $y += $sample_size) {
+            for ($x = $x_start; $x < $x_end; $x += $sample_size) {
+                $rgb = imagecolorat($image_resource, $x, $y);
+                $colors = imagecolorsforindex($image_resource, $rgb);
+                
+                $total_r += $colors['red'];
+                $total_g += $colors['green'];
+                $total_b += $colors['blue'];
+                $pixel_count++;
+                
+                $color_name = $this->get_color_name($colors['red'], $colors['green'], $colors['blue']);
+                if (!isset($color_counts[$color_name])) {
+                    $color_counts[$color_name] = 0;
+                }
+                $color_counts[$color_name]++;
+            }
+        }
+        
+        arsort($color_counts);
+        
+        $average_color = $pixel_count > 0 ? array(
+            'r' => (int)($total_r / $pixel_count),
+            'g' => (int)($total_g / $pixel_count),
+            'b' => (int)($total_b / $pixel_count)
+        ) : array('r' => 0, 'g' => 0, 'b' => 0);
+        
+        return array(
+            'dominant_colors' => array_slice($color_counts, 0, 3, true),
+            'average_color' => $average_color
+        );
+    }
+    
+    /**
+     * Detect objects in the image (basic implementation)
+     */
+    private function detect_objects_in_image($image_resource, $width, $height) {
+        // Basic object detection based on color regions and patterns
+        return array(
+            'detection_method' => 'color_region_analysis',
+            'detected_objects' => array(),
+            'background_analysis' => $this->analyze_background_area($image_resource, $width, $height)
+        );
+    }
+    
+    /**
+     * Analyze background area of the image
+     */
+    private function analyze_background_area($image_resource, $width, $height) {
+        // Analyze edges for background characteristics
+        $edge_colors = array();
+        $sample_size = 10;
+        
+        // Sample top, bottom, left, right edges
+        $edges = array(
+            'top' => array('x_range' => array(0, $width), 'y_range' => array(0, $height * 0.1)),
+            'bottom' => array('x_range' => array(0, $width), 'y_range' => array($height * 0.9, $height)),
+            'left' => array('x_range' => array(0, $width * 0.1), 'y_range' => array(0, $height)),
+            'right' => array('x_range' => array($width * 0.9, $width), 'y_range' => array(0, $height))
+        );
+        
+        foreach ($edges as $edge_name => $bounds) {
+            for ($y = $bounds['y_range'][0]; $y < $bounds['y_range'][1]; $y += $sample_size) {
+                for ($x = $bounds['x_range'][0]; $x < $bounds['x_range'][1]; $x += $sample_size) {
+                    if ($x >= 0 && $x < $width && $y >= 0 && $y < $height) {
+                        $rgb = imagecolorat($image_resource, (int)$x, (int)$y);
+                        $colors = imagecolorsforindex($image_resource, $rgb);
+                        $color_name = $this->get_color_name($colors['red'], $colors['green'], $colors['blue']);
+                        
+                        if (!isset($edge_colors[$color_name])) {
+                            $edge_colors[$color_name] = 0;
+                        }
+                        $edge_colors[$color_name]++;
+                    }
+                }
+            }
+        }
+        
+        arsort($edge_colors);
+        
+        return array(
+            'dominant_background_colors' => array_slice($edge_colors, 0, 5, true),
+            'likely_background_type' => $this->classify_background_type($edge_colors)
+        );
+    }
+    
+    /**
+     * Classify the type of background
+     */
+    private function classify_background_type($edge_colors) {
+        if (empty($edge_colors)) return 'unknown';
+        
+        $top_color = array_keys($edge_colors)[0];
+        $color_distribution = array_slice($edge_colors, 0, 3, true);
+        
+        // Simple background classification
+        if (isset($color_distribution['blue']) && $color_distribution['blue'] > array_sum($color_distribution) * 0.4) {
+            return 'sky/outdoor';
+        } elseif (isset($color_distribution['green']) && $color_distribution['green'] > array_sum($color_distribution) * 0.3) {
+            return 'nature/outdoor';
+        } elseif (isset($color_distribution['white']) || isset($color_distribution['gray'])) {
+            return 'indoor/neutral';
+        } else {
+            return 'mixed/complex';
+        }
+    }
+    
+    /**
+     * Analyze the overall scene of the image
+     */
+    private function analyze_image_scene($image_resource, $width, $height) {
+        $scene_analysis = array();
+        
+        // Analyze lighting conditions
+        $brightness = $this->analyze_image_brightness($image_resource, $width, $height);
+        $scene_analysis['lighting'] = array(
+            'overall_brightness' => $brightness['category'],
+            'lighting_type' => $brightness['average'] > 160 ? 'bright/daylight' : 
+                             ($brightness['average'] > 80 ? 'moderate/indoor' : 'dark/evening')
+        );
+        
+        // Analyze composition
+        $scene_analysis['composition'] = array(
+            'orientation' => $width > $height ? 'landscape' : ($height > $width ? 'portrait' : 'square'),
+            'aspect_ratio' => round($width / $height, 2)
+        );
+        
+        // Analyze color temperature
+        $color_dist = $this->analyze_color_distribution($image_resource, $width, $height);
+        $warm_colors = 0;
+        $cool_colors = 0;
+        
+        foreach ($color_dist as $region) {
+            foreach ($region as $color => $count) {
+                if (in_array($color, array('red', 'orange', 'yellow', 'brown'))) {
+                    $warm_colors += $count;
+                } elseif (in_array($color, array('blue', 'green', 'purple'))) {
+                    $cool_colors += $count;
+                }
+            }
+        }
+        
+        $scene_analysis['color_temperature'] = $warm_colors > $cool_colors ? 'warm' : 'cool';
+        
+        return $scene_analysis;
+    }
+    
+    /**
+     * Create intelligent transformation plan based on image analysis and instructions
+     */
+    private function create_intelligent_transformation_plan($image_analysis, $transformations, $instructions) {
+        $plan = array(
+            'analysis_summary' => array(
+                'image_analyzed' => $image_analysis['success'],
+                'people_detected' => $image_analysis['people_count'] ?? 0,
+                'dominant_colors' => count($image_analysis['dominant_colors'] ?? array()),
+                'instruction_intent' => $transformations['primary_intent'] ?? 'unknown'
+            ),
+            'transformation_strategy' => array(),
+            'execution_plan' => array()
+        );
+        
+        // Create specific transformation strategy based on analysis
+        if (isset($transformations['transformation_type']) && $transformations['transformation_type'] === 'clothing_modification') {
+            $plan['transformation_strategy']['type'] = 'object_specific';
+            $plan['transformation_strategy']['focus'] = 'clothing_color_change';
+            
+            // Match detected clothing with requested changes
+            if (!empty($image_analysis['clothing_items']['detected_areas'])) {
+                $plan['execution_plan']['clothing_targets'] = array();
+                
+                foreach ($image_analysis['clothing_items']['detected_areas'] as $clothing_area) {
+                    if ($clothing_area['type'] === 'shirt_area' && 
+                        isset($transformations['target_clothing']) && 
+                        in_array('shirt', $transformations['target_clothing'])) {
+                        
+                        $plan['execution_plan']['clothing_targets'][] = array(
+                            'area' => $clothing_area['bounds'],
+                            'current_colors' => $clothing_area['dominant_colors'],
+                            'target_colors' => $transformations['target_colors'] ?? array('black'),
+                            'transformation_type' => 'color_change'
+                        );
+                    }
+                }
+            }
+        }
+        
+        // Add environmental transformation planning
+        if (isset($transformations['weather_analysis'])) {
+            $plan['transformation_strategy']['environmental'] = $transformations['weather_analysis'];
+        }
+        
+        // Add user feedback message about what will be processed
+        $plan['user_feedback'] = $this->generate_transformation_feedback($image_analysis, $transformations, $instructions);
+        
+        return $plan;
+    }
+    
+    /**
+     * Generate user feedback about what was detected and will be processed
+     */
+    private function generate_transformation_feedback($image_analysis, $transformations, $instructions) {
+        $feedback = array();
+        
+        // Analysis summary
+        $feedback[] = sprintf(
+            "🔍 Image Analysis: Detected %d people and %d clothing areas in the photo.",
+            $image_analysis['people_count'] ?? 0,
+            $image_analysis['clothing_count'] ?? 0
+        );
+        
+        // Dominant colors found
+        if (!empty($image_analysis['dominant_colors'])) {
+            $top_colors = array_slice($image_analysis['dominant_colors'], 0, 3);
+            $color_names = array_map(function($c) { return $c['color_name']; }, $top_colors);
+            $feedback[] = "🎨 Dominant colors found: " . implode(', ', $color_names);
+        }
+        
+        // Transformation plan
+        if (isset($transformations['transformation_type']) && $transformations['transformation_type'] === 'clothing_modification') {
+            $clothing_items = implode(', ', $transformations['target_clothing'] ?? array());
+            $colors = implode(', ', $transformations['target_colors'] ?? array());
+            $feedback[] = "🎯 Plan: Will change {$clothing_items} color to {$colors}";
+        }
+        
+        // Original instruction
+        $feedback[] = "📝 Your request: \"$instructions\"";
+        
+        return implode("\n", $feedback);
+    }
+    
+    /**
+     * Apply comprehensive intelligent transformations with image understanding
+     */
+    private function apply_comprehensive_intelligent_transformations($image_resource, $transformations, $image_analysis, $transformation_plan, $width, $height) {
+        error_log('AI Photo Recreator: Applying comprehensive transformations with image understanding');
+        
+        // Apply base transformations first
+        $this->apply_intelligent_advanced_transformations($image_resource, $transformations, $width, $height);
+        
+        // Apply image-aware object-specific transformations
+        if (isset($transformation_plan['execution_plan']['clothing_targets'])) {
+            error_log('AI Photo Recreator: Applying image-aware clothing transformations');
+            $this->apply_image_aware_clothing_transformations($image_resource, $transformation_plan['execution_plan']['clothing_targets'], $width, $height);
+        }
+        
+        // Apply scene-specific adjustments based on image analysis
+        if (isset($image_analysis['scene_analysis'])) {
+            $this->apply_scene_aware_adjustments($image_resource, $image_analysis['scene_analysis']);
+        }
+    }
+    
+    /**
+     * Apply image-aware clothing transformations
+     */
+    private function apply_image_aware_clothing_transformations($image_resource, $clothing_targets, $width, $height) {
+        foreach ($clothing_targets as $target) {
+            if ($target['transformation_type'] === 'color_change') {
+                $this->apply_selective_color_transformation($image_resource, $target['area'], $target['target_colors'], $width, $height);
+            }
+        }
+    }
+    
+    /**
+     * Apply selective color transformation to specific image area
+     */
+    private function apply_selective_color_transformation($image_resource, $area, $target_colors, $image_width, $image_height) {
+        error_log('AI Photo Recreator: Applying selective color transformation to area');
+        
+        $x_start = max(0, (int)$area['x']);
+        $y_start = max(0, (int)$area['y']);
+        $x_end = min($image_width, $x_start + (int)$area['width']);
+        $y_end = min($image_height, $y_start + (int)$area['height']);
+        
+        // Get target color (use first color if multiple)
+        $target_color = $target_colors[0] ?? 'black';
+        $target_rgb = $this->get_target_color_rgb($target_color);
+        
+        error_log("AI Photo Recreator: Transforming area ({$x_start},{$y_start}) to ({$x_end},{$y_end}) to color: {$target_color}");
+        
+        // Create overlay for color transformation
+        $overlay = imagecreatetruecolor($x_end - $x_start, $y_end - $y_start);
+        imagesavealpha($overlay, true);
+        $transparent = imagecolorallocatealpha($overlay, 0, 0, 0, 127);
+        imagefill($overlay, 0, 0, $transparent);
+        
+        // Apply color transformation with intelligent blending
+        for ($y = $y_start; $y < $y_end; $y++) {
+            for ($x = $x_start; $x < $x_end; $x++) {
+                $current_rgb = imagecolorat($image_resource, $x, $y);
+                $current_colors = imagecolorsforindex($image_resource, $current_rgb);
+                
+                // Check if this pixel should be transformed (not skin tone, not background)
+                if (!$this->is_skin_tone($current_colors['red'], $current_colors['green'], $current_colors['blue'])) {
+                    // Calculate blend factor based on how "clothing-like" the pixel is
+                    $blend_factor = $this->calculate_clothing_blend_factor($current_colors, $area);
+                    
+                    if ($blend_factor > 0.3) {
+                        // Apply color transformation
+                        $new_r = (int)($target_rgb['r'] * $blend_factor + $current_colors['red'] * (1 - $blend_factor));
+                        $new_g = (int)($target_rgb['g'] * $blend_factor + $current_colors['green'] * (1 - $blend_factor));
+                        $new_b = (int)($target_rgb['b'] * $blend_factor + $current_colors['blue'] * (1 - $blend_factor));
+                        
+                        $new_color = imagecolorallocate($image_resource, $new_r, $new_g, $new_b);
+                        imagesetpixel($image_resource, $x, $y, $new_color);
+                    }
+                }
+            }
+        }
+        
+        imagedestroy($overlay);
+    }
+    
+    /**
+     * Get RGB values for target color name
+     */
+    private function get_target_color_rgb($color_name) {
+        $colors = array(
+            'black' => array('r' => 20, 'g' => 20, 'b' => 20),
+            'siyah' => array('r' => 20, 'g' => 20, 'b' => 20),
+            'white' => array('r' => 240, 'g' => 240, 'b' => 240),
+            'beyaz' => array('r' => 240, 'g' => 240, 'b' => 240),
+            'red' => array('r' => 200, 'g' => 50, 'b' => 50),
+            'kırmızı' => array('r' => 200, 'g' => 50, 'b' => 50),
+            'blue' => array('r' => 50, 'g' => 100, 'b' => 200),
+            'mavi' => array('r' => 50, 'g' => 100, 'b' => 200),
+            'green' => array('r' => 50, 'g' => 150, 'b' => 50),
+            'yeşil' => array('r' => 50, 'g' => 150, 'b' => 50)
+        );
+        
+        return $colors[strtolower($color_name)] ?? $colors['black'];
+    }
+    
+    /**
+     * Calculate how much a pixel should be blended with target color
+     */
+    private function calculate_clothing_blend_factor($current_colors, $area) {
+        // Basic implementation - can be enhanced with more sophisticated analysis
+        $r = $current_colors['red'];
+        $g = $current_colors['green'];
+        $b = $current_colors['blue'];
+        
+        // Higher blend factor for non-skin, non-extreme colors
+        if ($this->is_skin_tone($r, $g, $b)) {
+            return 0; // Don't transform skin
+        }
+        
+        // Check for very bright or very dark pixels (likely background or shadows)
+        $brightness = (0.299 * $r + 0.587 * $g + 0.114 * $b);
+        if ($brightness > 220 || $brightness < 30) {
+            return 0.2; // Minimal transformation for background/shadows
+        }
+        
+        return 0.8; // Strong transformation for likely clothing pixels
+    }
+    
+    /**
+     * Apply scene-aware adjustments based on image analysis
+     */
+    private function apply_scene_aware_adjustments($image_resource, $scene_analysis) {
+        // Apply adjustments based on lighting and color temperature
+        if (isset($scene_analysis['lighting']['lighting_type'])) {
+            $lighting_type = $scene_analysis['lighting']['lighting_type'];
+            
+            if ($lighting_type === 'dark/evening') {
+                // Enhance visibility for dark images
+                imagefilter($image_resource, IMG_FILTER_BRIGHTNESS, 10);
+            } elseif ($lighting_type === 'bright/daylight') {
+                // Slight contrast enhancement for bright images
+                imagefilter($image_resource, IMG_FILTER_CONTRAST, 5);
+            }
+        }
+        
+        // Apply color temperature adjustments
+        if (isset($scene_analysis['color_temperature'])) {
+            if ($scene_analysis['color_temperature'] === 'cool') {
+                // Warm up cool images slightly
+                imagefilter($image_resource, IMG_FILTER_COLORIZE, 5, 0, -5);
+            }
+        }
     }
 }
