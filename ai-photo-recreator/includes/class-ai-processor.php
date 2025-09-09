@@ -2313,25 +2313,21 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
      * Detect clothing areas using advanced computer vision techniques
      */
     private function detect_clothing_areas_advanced($image_resource, $width, $height) {
+        error_log('AI Photo Recreator: Basitleştirilmiş ama etkili giysi algılama başlatılıyor');
+        
         $clothing_areas = array();
         
-        // Method 1: Skin tone exclusion + edge detection
-        $skin_areas = $this->detect_skin_areas($image_resource, $width, $height);
-        $edge_map = $this->create_edge_map($image_resource, $width, $height);
+        // Basit ama etkili yöntem: Daha geniş torso alanı + renk analizi
+        $torso_areas = $this->detect_simple_clothing_regions($image_resource, $width, $height);
         
-        // Method 2: Color clustering to find uniform clothing regions
-        $color_clusters = $this->find_clothing_color_clusters($image_resource, $width, $height, $skin_areas);
+        if (!empty($torso_areas)) {
+            error_log('AI Photo Recreator: ' . count($torso_areas) . ' giysi bölgesi tespit edildi');
+            return $torso_areas;
+        }
         
-        // Method 3: Region growing from torso area
-        $torso_region = $this->find_torso_clothing_region($image_resource, $width, $height, $skin_areas);
-        
-        // Combine and validate results
-        $clothing_areas = array_merge($color_clusters, array($torso_region));
-        $clothing_areas = array_filter($clothing_areas, function($area) {
-            return isset($area['confidence']) && $area['confidence'] > 0.3;
-        });
-        
-        return $clothing_areas;
+        // Fallback: Geniş giysi alanı tahmini
+        error_log('AI Photo Recreator: Fallback giysi alanı kullanılıyor');
+        return array($this->get_better_clothing_area($width, $height));
     }
     
     /**
@@ -2619,6 +2615,114 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     }
     
     /**
+     * Basit ama etkili giysi bölgelerini tespit et
+     */
+    private function detect_simple_clothing_regions($image_resource, $width, $height) {
+        $regions = array();
+        
+        // Ana gövde alanları - daha geniş kapsama
+        $torso_regions = array(
+            // Üst gövde (gömlek/tişört alanı)
+            array(
+                'x1' => intval($width * 0.2), 
+                'y1' => intval($height * 0.25), 
+                'x2' => intval($width * 0.8), 
+                'y2' => intval($height * 0.7),
+                'priority' => 'high'
+            ),
+            // Alt gövde (pantolon alanı)
+            array(
+                'x1' => intval($width * 0.25), 
+                'y1' => intval($height * 0.65), 
+                'x2' => intval($width * 0.75), 
+                'y2' => intval($height * 0.95),
+                'priority' => 'medium'
+            )
+        );
+        
+        foreach ($torso_regions as $region) {
+            $analysis = $this->analyze_region_for_clothing($image_resource, $region);
+            if ($analysis['has_clothing']) {
+                $regions[] = array(
+                    'bounds' => array(
+                        'x1' => $region['x1'],
+                        'y1' => $region['y1'],
+                        'x2' => $region['x2'],
+                        'y2' => $region['y2']
+                    ),
+                    'confidence' => $analysis['confidence'],
+                    'type' => 'simple_detection',
+                    'priority' => $region['priority']
+                );
+                
+                error_log('AI Photo Recreator: Giysi bölgesi tespit edildi - Güven: ' . $analysis['confidence'] . ', Öncelik: ' . $region['priority']);
+            }
+        }
+        
+        return $regions;
+    }
+    
+    /**
+     * Daha iyi giysi alanı tahmini
+     */
+    private function get_better_clothing_area($width, $height) {
+        return array(
+            'bounds' => array(
+                'x1' => intval($width * 0.15),  // Daha geniş
+                'y1' => intval($height * 0.2),  // Daha yukarı
+                'x2' => intval($width * 0.85),  // Daha geniş 
+                'y2' => intval($height * 0.8)   // Daha aşağı
+            ),
+            'confidence' => 0.7,  // Daha yüksek güven
+            'type' => 'improved_estimated_area'
+        );
+    }
+    
+    /**
+     * Bölgeyi giysi için analiz et
+     */
+    private function analyze_region_for_clothing($image_resource, $region) {
+        $non_skin_pixels = 0;
+        $total_pixels = 0;
+        $color_variance = 0;
+        
+        // Bölgeyi örnekle
+        $step = max(3, intval(min($region['x2']-$region['x1'], $region['y2']-$region['y1']) / 25));
+        
+        for ($y = $region['y1']; $y < $region['y2'] && $y < imagesy($image_resource); $y += $step) {
+            for ($x = $region['x1']; $x < $region['x2'] && $x < imagesx($image_resource); $x += $step) {
+                $rgb = imagecolorat($image_resource, $x, $y);
+                $r = ($rgb >> 16) & 0xFF;
+                $g = ($rgb >> 8) & 0xFF;
+                $b = $rgb & 0xFF;
+                
+                $total_pixels++;
+                
+                // Ten rengi değilse giysi olabilir
+                if (!$this->is_skin_color($r, $g, $b)) {
+                    $non_skin_pixels++;
+                }
+            }
+        }
+        
+        if ($total_pixels == 0) {
+            return array('has_clothing' => false, 'confidence' => 0);
+        }
+        
+        $non_skin_ratio = $non_skin_pixels / $total_pixels;
+        
+        // %40'tan fazla non-skin pixel varsa giysi olabilir
+        $has_clothing = $non_skin_ratio > 0.4;
+        $confidence = min(0.9, $non_skin_ratio * 1.5);
+        
+        return array(
+            'has_clothing' => $has_clothing,
+            'confidence' => $confidence,
+            'non_skin_ratio' => $non_skin_ratio
+        );
+    }
+    
+    /**
      * Apply advanced color transformation to detected clothing areas
      */
     private function apply_advanced_color_transformation($image_resource, $clothing_areas, $target_color, $width, $height) {
@@ -2662,13 +2766,21 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     
     /**
      * Transform color in a specific area while preserving texture and lighting
+     * Geliştirilmiş renk değiştirme algoritması
      */
     private function transform_area_color($image_resource, $area, $target_rgb) {
         $bounds = $area['bounds'];
         $confidence = $area['confidence'] ?? 0.7;
+        $priority = $area['priority'] ?? 'medium';
         
-        // Calculate transformation strength based on confidence
-        $strength = min(1.0, $confidence * 1.5);
+        error_log('AI Photo Recreator: Alan renk dönüştürme - Güven: ' . $confidence . ', Öncelik: ' . $priority);
+        
+        // Önceliğe göre güç hesapla
+        $base_strength = $priority === 'high' ? 0.8 : 0.6;
+        $strength = min(1.0, $confidence * $base_strength * 1.5);
+        
+        $transformed_pixels = 0;
+        $skipped_pixels = 0;
         
         for ($y = $bounds['y1']; $y <= $bounds['y2']; $y++) {
             for ($x = $bounds['x1']; $x <= $bounds['x2']; $x++) {
@@ -2679,35 +2791,103 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                 $current_g = ($current_rgb >> 8) & 0xFF;
                 $current_b = $current_rgb & 0xFF;
                 
-                // Skip if this looks like skin
-                if ($this->is_skin_color($current_r, $current_g, $current_b)) {
+                // Ten rengi kontrolü - geliştirili
+                if ($this->is_skin_color_improved($current_r, $current_g, $current_b)) {
+                    $skipped_pixels++;
                     continue;
                 }
                 
-                // Calculate luminance to preserve lighting
+                // Çok koyu veya çok açık pikselleri atla (muhtemelen saç/göz/diş)
+                $brightness = ($current_r + $current_g + $current_b) / 3;
+                if ($brightness < 20 || $brightness > 240) {
+                    $skipped_pixels++;
+                    continue;
+                }
+                
+                // Luminans hesapla ve koru
                 $luminance = 0.299 * $current_r + 0.587 * $current_g + 0.114 * $current_b;
                 $target_luminance = 0.299 * $target_rgb['r'] + 0.587 * $target_rgb['g'] + 0.114 * $target_rgb['b'];
                 
-                // Adjust target color to match original luminance (preserve lighting)
+                // Hedef rengi orijinal parlaklığa ayarla
                 $luminance_factor = $target_luminance > 0 ? $luminance / $target_luminance : 1;
-                $adjusted_r = min(255, intval($target_rgb['r'] * $luminance_factor));
-                $adjusted_g = min(255, intval($target_rgb['g'] * $luminance_factor));
-                $adjusted_b = min(255, intval($target_rgb['b'] * $luminance_factor));
+                $adjusted_r = min(255, max(0, intval($target_rgb['r'] * $luminance_factor)));
+                $adjusted_g = min(255, max(0, intval($target_rgb['g'] * $luminance_factor)));
+                $adjusted_b = min(255, max(0, intval($target_rgb['b'] * $luminance_factor)));
                 
-                // Blend with original color for smooth transition
+                // Yumuşak karıştırma
                 $final_r = intval($current_r * (1 - $strength) + $adjusted_r * $strength);
                 $final_g = intval($current_g * (1 - $strength) + $adjusted_g * $strength);
                 $final_b = intval($current_b * (1 - $strength) + $adjusted_b * $strength);
                 
-                // Apply the color
+                // Rengi uygula
                 $new_color = imagecolorallocate($image_resource, $final_r, $final_g, $final_b);
                 if ($new_color !== false) {
                     imagesetpixel($image_resource, $x, $y, $new_color);
+                    $transformed_pixels++;
                 }
             }
         }
         
-        error_log('AI Photo Recreator: Transformed area with confidence ' . $confidence);
+        error_log('AI Photo Recreator: Dönüştürülen piksel: ' . $transformed_pixels . ', Atlanan: ' . $skipped_pixels . ', Güç: ' . number_format($strength, 2));
+    }
+    
+    /**
+     * Geliştirilmiş ten rengi tespiti
+     */
+    private function is_skin_color_improved($r, $g, $b) {
+        // Çoklu yöntemle ten rengi tespiti
+        
+        // Yöntem 1: Geliştirilmiş RGB
+        $rgb_skin = ($r > 80 && $g > 40 && $b > 20 && 
+                    ($r - $g) > 10 && $r > $g && $r > $b &&
+                    $r < 250 && $g < 200 && $b < 150);
+        
+        // Yöntem 2: YCbCr renk uzayı
+        $y = 0.299 * $r + 0.587 * $g + 0.114 * $b;
+        $cb = -0.169 * $r - 0.331 * $g + 0.500 * $b + 128;
+        $cr = 0.500 * $r - 0.419 * $g - 0.081 * $b + 128;
+        
+        $ycbcr_skin = ($y > 70 && $cb >= 80 && $cb <= 140 && $cr >= 130 && $cr <= 185);
+        
+        // Yöntem 3: HSV tabanlı kontrol
+        $hsv = $this->rgb_to_hsv($r, $g, $b);
+        $hsv_skin = ($hsv['h'] >= 0 && $hsv['h'] <= 50 && $hsv['s'] > 0.2 && $hsv['s'] < 0.7 && $hsv['v'] > 0.3);
+        
+        return $rgb_skin || $ycbcr_skin || $hsv_skin;
+    }
+    
+    /**
+     * RGB to HSV conversion
+     */
+    private function rgb_to_hsv($r, $g, $b) {
+        $r = $r / 255.0;
+        $g = $g / 255.0; 
+        $b = $b / 255.0;
+        
+        $max = max($r, $g, $b);
+        $min = min($r, $g, $b);
+        $diff = $max - $min;
+        
+        // Hue
+        if ($diff == 0) {
+            $h = 0;
+        } elseif ($max == $r) {
+            $h = fmod((($g - $b) / $diff), 6);
+        } elseif ($max == $g) {
+            $h = ($b - $r) / $diff + 2;
+        } else {
+            $h = ($r - $g) / $diff + 4;
+        }
+        $h = $h * 60;
+        if ($h < 0) $h += 360;
+        
+        // Saturation
+        $s = $max == 0 ? 0 : $diff / $max;
+        
+        // Value
+        $v = $max;
+        
+        return array('h' => $h, 's' => $s, 'v' => $v);
     }
     
     /**
@@ -7054,7 +7234,7 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
      */
     private function create_user_feedback_message($analysis_details, $instructions) {
         if (!$analysis_details || !isset($analysis_details['image_analysis'])) {
-            return __('Photo transformed successfully! Configure OpenAI API key for enhanced AI processing.', 'ai-photo-recreator');
+            return '🤖 Fotoğraf başarıyla dönüştürüldü! Daha iyi sonuçlar için OpenAI API key yapılandırabilirsiniz.';
         }
         
         $image_analysis = $analysis_details['image_analysis'];
@@ -7062,37 +7242,37 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         
         $feedback_parts = array();
         
-        // Analysis summary
+        // Analiz özeti - Türkçe
         $feedback_parts[] = sprintf(
-            '🔍 Analysis: Detected %d people and %d clothing areas in your photo.',
+            '🔍 Analiz: Fotoğrafınızda %d kişi ve %d giysi bölgesi tespit edildi.',
             $image_analysis['people_count'] ?? 0,
             $image_analysis['clothing_count'] ?? 0
         );
         
-        // Clothing-specific feedback
+        // Giysi-özel geri bildirim - Türkçe
         if (isset($transformations['transformation_type']) && $transformations['transformation_type'] === 'clothing_modification') {
             $clothing_items = implode(', ', $transformations['target_clothing'] ?? array());
             $colors = implode(', ', $transformations['target_colors'] ?? array());
             
             if (!empty($clothing_items) && !empty($colors)) {
                 $feedback_parts[] = sprintf(
-                    '🎯 Applied: Changed %s color to %s as requested.',
+                    '🎯 Uygulanan: %s rengini %s olarak değiştirdim.',
                     $clothing_items,
                     $colors
                 );
             }
         }
         
-        // Dominant colors feedback
+        // Baskın renk geri bildirimi - Türkçe
         if (!empty($image_analysis['dominant_colors'])) {
             $top_colors = array_slice($image_analysis['dominant_colors'], 0, 3);
             $color_names = array_map(function($c) { return $c['color_name']; }, $top_colors);
-            $feedback_parts[] = '🎨 Original colors: ' . implode(', ', $color_names);
+            $feedback_parts[] = '🎨 Orijinal renkler: ' . implode(', ', $color_names);
         }
         
-        // Processing type feedback
-        $feedback_parts[] = '⚡ Processing: Advanced local AI with comprehensive image understanding.';
-        $feedback_parts[] = '💡 Tip: Configure OpenAI API key in settings for even better cloud-based AI results!';
+        // İşleme türü geri bildirimi - Türkçe
+        $feedback_parts[] = '⚡ İşleme: Gelişmiş yerel AI ile kapsamlı görüntü analizi.';
+        $feedback_parts[] = '💡 İpucu: Daha iyi bulut-tabanlı AI sonuçları için ayarlardan OpenAI API key yapılandırabilirsiniz!';
         
         return implode(' ', $feedback_parts);
     }
