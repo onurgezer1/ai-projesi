@@ -124,13 +124,53 @@ class AI_Photo_Processor {
     }
     
     /**
-     * AI processing with real OpenAI integration
+     * AI processing with simplified new system (user specifications)
      * 
      * @param string $file_path Original file path
      * @param string $instructions User instructions
      * @return array Processing result
      */
     private function ai_process($file_path, $instructions) {
+        try {
+            error_log('New AI Photo Recreator: Starting simplified processing');
+            
+            // Load the new simplified AI processor
+            require_once plugin_dir_path(__FILE__) . 'class-new-ai-processor.php';
+            $new_processor = new New_AI_Photo_Processor();
+            
+            // Process with new simplified system
+            $result = $new_processor->process_photo($file_path, $instructions);
+            
+            if ($result['success']) {
+                error_log('New AI Photo Recreator: Processing successful');
+                return $result;
+            } else {
+                error_log('New AI Photo Recreator: Processing failed - ' . $result['message']);
+                // Fallback to OpenAI if available
+                $options = get_option('ai_photo_recreator_options', array());
+                $api_key = isset($options['api_key']) ? trim($options['api_key']) : '';
+                
+                if (!empty($api_key)) {
+                    error_log('New AI Photo Recreator: Falling back to OpenAI processing');
+                    return $this->process_with_openai_fallback($file_path, $instructions, $api_key);
+                } else {
+                    return $result;
+                }
+            }
+            
+        } catch (Exception $e) {
+            error_log('New AI Photo Recreator Error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => __('An error occurred during processing', 'ai-photo-recreator')
+            );
+        }
+    }
+    
+    /**
+     * Fallback to OpenAI processing
+     */
+    private function process_with_openai_fallback($file_path, $instructions, $api_key) {
         try {
             $upload_dir = wp_upload_dir();
             $ai_dir = $upload_dir['basedir'] . '/ai-photo-recreator/';
@@ -146,55 +186,9 @@ class AI_Photo_Processor {
                 }
             }
             
-            // Check if original file exists
-            if (!file_exists($file_path)) {
-                return array(
-                    'success' => false,
-                    'message' => __('Original file not found', 'ai-photo-recreator')
-                );
-            }
-            
-            // Get API key from settings
-            $options = get_option('ai_photo_recreator_options', array());
-            $api_key = isset($options['api_key']) ? trim($options['api_key']) : '';
-            
-            error_log('AI Photo Recreator: API Key present: ' . (!empty($api_key) ? 'YES' : 'NO'));
-            
             $file_info = pathinfo($file_path);
             $processed_filename = 'processed_' . time() . '_' . $file_info['filename'] . '.' . $file_info['extension'];
             $processed_path = $processed_dir . $processed_filename;
-            
-            // If no API key is provided, use sophisticated local processing
-            if (empty($api_key)) {
-                error_log('AI Photo Recreator: No API key configured, using sophisticated local processing');
-                $local_result = $this->create_advanced_transformation($file_path, $processed_path, $instructions);
-                
-                if ($local_result['success']) {
-                    $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
-                    
-                    // Create detailed user feedback message
-                    $user_feedback = $this->create_user_feedback_message($local_result['analysis_details'], $instructions);
-                    
-                    return array(
-                        'success' => true,
-                        'processed_file' => $processed_path,
-                        'processed_url' => $processed_url,
-                        'download_url' => add_query_arg(array(
-                            'action' => 'ai_photo_download',
-                            'file' => urlencode($processed_filename),
-                            'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
-                        ), admin_url('admin-ajax.php')),
-                        'message' => $user_feedback,
-                        'analysis_details' => $local_result['analysis_details']
-                    );
-                } else {
-                    return array(
-                        'success' => false,
-                        'message' => $local_result['message'],
-                        'analysis_details' => $local_result['analysis_details']
-                    );
-                }
-            }
             
             error_log('AI Photo Recreator: Starting OpenAI processing with instructions: ' . $instructions);
             
@@ -228,80 +222,21 @@ class AI_Photo_Processor {
                     );
                 }
             } else {
-                // AI processing failed - check if it's a quota issue and provide clear guidance
-                $is_quota_issue = (strpos($ai_result['message'], '429') !== false || 
-                                 strpos($ai_result['message'], 'quota') !== false ||
-                                 strpos($ai_result['message'], 'insufficient_quota') !== false);
-                
-                if ($is_quota_issue) {
-                    error_log('AI Photo Recreator: OpenAI quota exceeded, using sophisticated local processing: ' . $ai_result['message']);
-                    
-                    $local_result = $this->create_advanced_transformation($file_path, $processed_path, $instructions);
-                    
-                    if ($local_result['success']) {
-                        $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
-                        
-                        $user_feedback = $this->create_user_feedback_message($local_result['analysis_details'], $instructions);
-                        $quota_warning = '⚠️ OpenAI API quota exceeded. Check billing at platform.openai.com. ';
-                        
-                        return array(
-                            'success' => true,
-                            'processed_file' => $processed_path,
-                            'processed_url' => $processed_url,
-                            'download_url' => add_query_arg(array(
-                                'action' => 'ai_photo_download',
-                                'file' => urlencode($processed_filename),
-                                'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
-                            ), admin_url('admin-ajax.php')),
-                            'message' => $quota_warning . $user_feedback,
-                            'analysis_details' => $local_result['analysis_details']
-                        );
-                    } else {
-                        return array(
-                            'success' => false,
-                            'message' => __('OpenAI quota exceeded and local processing failed. Please check your OpenAI billing and try again.', 'ai-photo-recreator')
-                        );
-                    }
-                } else {
-                    // Other API errors - still try local processing
-                    error_log('AI Photo Recreator: OpenAI processing failed, using sophisticated local processing: ' . $ai_result['message']);
-                    
-                    $local_result = $this->create_advanced_transformation($file_path, $processed_path, $instructions);
-                    
-                    if ($local_result['success']) {
-                        $processed_url = $upload_dir['baseurl'] . '/ai-photo-recreator/processed/' . $processed_filename;
-                        
-                        $user_feedback = $this->create_user_feedback_message($local_result['analysis_details'], $instructions);
-                        
-                        return array(
-                            'success' => true,
-                            'processed_file' => $processed_path,
-                            'processed_url' => $processed_url,
-                            'download_url' => add_query_arg(array(
-                                'action' => 'ai_photo_download',
-                                'file' => urlencode($processed_filename),
-                                'nonce' => wp_create_nonce('ai_photo_download_' . $processed_filename)
-                            ), admin_url('admin-ajax.php')),
-                            'message' => sprintf(__('OpenAI unavailable (%s). Applied advanced local processing with comprehensive analysis. %s', 'ai-photo-recreator'), substr($ai_result['message'], 0, 50), $user_feedback),
-                            'analysis_details' => $local_result['analysis_details']
-                        );
-                    } else {
-                        return array(
-                            'success' => false,
-                            'message' => sprintf(__('OpenAI processing failed: %s. Local processing also failed. Check debug-openai-test.php for diagnostics.', 'ai-photo-recreator'), $ai_result['message'])
-                        );
-                    }
-                }
+                return array(
+                    'success' => false,
+                    'message' => sprintf(__('OpenAI processing failed: %s', 'ai-photo-recreator'), $ai_result['message'])
+                );
             }
             
         } catch (Exception $e) {
-            error_log('AI Photo Recreator Processing Error: ' . $e->getMessage());
+            error_log('AI Photo Recreator: OpenAI fallback error: ' . $e->getMessage());
             return array(
                 'success' => false,
-                'message' => __('An error occurred during AI processing', 'ai-photo-recreator')
+                'message' => __('OpenAI processing error', 'ai-photo-recreator')
             );
         }
     }
+
     
     /**
      * Process image with OpenAI - Enhanced Vision + DALL-E pipeline with local analysis integration
