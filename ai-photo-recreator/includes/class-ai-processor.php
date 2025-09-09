@@ -2286,56 +2286,441 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     }
     
     /**
-     * Apply clothing color transformation
-     * This simulates color changes through selective color adjustment
+     * Apply clothing color transformation with advanced detection and realistic color changes
      */
     private function apply_clothing_color_transformation($image_resource, $target_clothing, $target_colors, $width, $height) {
-        error_log('AI Photo Recreator: Applying clothing color transformation');
+        error_log('AI Photo Recreator: Applying advanced clothing color transformation');
         error_log('AI Photo Recreator: Target clothing: ' . implode(', ', $target_clothing));
         error_log('AI Photo Recreator: Target colors: ' . implode(', ', $target_colors));
         
-        // Since we can't do precise object detection with GD library alone,
-        // we'll apply selective color transformations that simulate the effect
+        // Step 1: Detect clothing areas using advanced algorithms
+        $clothing_areas = $this->detect_clothing_areas_advanced($image_resource, $width, $height);
+        error_log('AI Photo Recreator: Detected ' . count($clothing_areas) . ' potential clothing areas');
         
+        if (empty($clothing_areas)) {
+            error_log('AI Photo Recreator: No clothing areas detected, using fallback method');
+            // Fallback to estimated torso area
+            $clothing_areas = array($this->get_estimated_clothing_area($width, $height));
+        }
+        
+        // Step 2: Apply color transformations to detected areas
         foreach ($target_colors as $target_color) {
-            switch ($target_color) {
-                case 'black':
-                    // Create a darkening effect focused on lighter areas (where clothing typically is)
-                    $this->apply_selective_darkening($image_resource, $width, $height);
-                    // Add overlay to simulate black clothing
-                    $this->add_clothing_color_overlay($image_resource, $width, $height, 'black');
-                    break;
-                    
-                case 'white':
-                    // Create a brightening effect
-                    $this->apply_selective_brightening($image_resource, $width, $height);
-                    $this->add_clothing_color_overlay($image_resource, $width, $height, 'white');
-                    break;
-                    
-                case 'red':
-                    // Add red tinting to mid-tone areas
-                    $this->add_clothing_color_overlay($image_resource, $width, $height, 'red');
-                    break;
-                    
-                case 'blue':
-                    // Add blue tinting to mid-tone areas
-                    $this->add_clothing_color_overlay($image_resource, $width, $height, 'blue');
-                    break;
-                    
-                case 'green':
-                    $this->add_clothing_color_overlay($image_resource, $width, $height, 'green');
-                    break;
-                    
-                default:
-                    // General color overlay
-                    $this->add_clothing_color_overlay($image_resource, $width, $height, $target_color);
-                    break;
-            }
+            $this->apply_advanced_color_transformation($image_resource, $clothing_areas, $target_color, $width, $height);
         }
     }
     
     /**
-     * Apply selective darkening for black clothing simulation
+     * Detect clothing areas using advanced computer vision techniques
+     */
+    private function detect_clothing_areas_advanced($image_resource, $width, $height) {
+        $clothing_areas = array();
+        
+        // Method 1: Skin tone exclusion + edge detection
+        $skin_areas = $this->detect_skin_areas($image_resource, $width, $height);
+        $edge_map = $this->create_edge_map($image_resource, $width, $height);
+        
+        // Method 2: Color clustering to find uniform clothing regions
+        $color_clusters = $this->find_clothing_color_clusters($image_resource, $width, $height, $skin_areas);
+        
+        // Method 3: Region growing from torso area
+        $torso_region = $this->find_torso_clothing_region($image_resource, $width, $height, $skin_areas);
+        
+        // Combine and validate results
+        $clothing_areas = array_merge($color_clusters, array($torso_region));
+        $clothing_areas = array_filter($clothing_areas, function($area) {
+            return isset($area['confidence']) && $area['confidence'] > 0.3;
+        });
+        
+        return $clothing_areas;
+    }
+    
+    /**
+     * Detect skin areas to avoid transforming faces/hands
+     */
+    private function detect_skin_areas($image_resource, $width, $height) {
+        $skin_areas = array();
+        
+        // Sample image to find skin tone pixels
+        $sample_size = max(5, min($width, $height) / 20);
+        
+        for ($y = 0; $y < $height - $sample_size; $y += $sample_size) {
+            for ($x = 0; $x < $width - $sample_size; $x += $sample_size) {
+                $region_info = $this->analyze_region_for_skin($image_resource, $x, $y, $sample_size);
+                if ($region_info['is_skin']) {
+                    $skin_areas[] = array(
+                        'x' => $x,
+                        'y' => $y,
+                        'width' => $sample_size,
+                        'height' => $sample_size,
+                        'confidence' => $region_info['confidence']
+                    );
+                }
+            }
+        }
+        
+        return $skin_areas;
+    }
+    
+    /**
+     * Analyze a region to determine if it contains skin
+     */
+    private function analyze_region_for_skin($image_resource, $x, $y, $size) {
+        $skin_pixels = 0;
+        $total_pixels = 0;
+        $avg_r = $avg_g = $avg_b = 0;
+        
+        // Sample pixels in the region
+        $step = max(1, intval($size / 5));
+        for ($py = $y; $py < $y + $size && $py < imagesy($image_resource); $py += $step) {
+            for ($px = $x; $px < $x + $size && $px < imagesx($image_resource); $px += $step) {
+                $rgb = imagecolorat($image_resource, $px, $py);
+                $r = ($rgb >> 16) & 0xFF;
+                $g = ($rgb >> 8) & 0xFF;
+                $b = $rgb & 0xFF;
+                
+                $avg_r += $r; $avg_g += $g; $avg_b += $b;
+                $total_pixels++;
+                
+                // Skin tone detection using HSV and RGB thresholds
+                if ($this->is_skin_color($r, $g, $b)) {
+                    $skin_pixels++;
+                }
+            }
+        }
+        
+        if ($total_pixels === 0) return array('is_skin' => false, 'confidence' => 0);
+        
+        $skin_ratio = $skin_pixels / $total_pixels;
+        
+        return array(
+            'is_skin' => $skin_ratio > 0.4,
+            'confidence' => $skin_ratio,
+            'avg_color' => array(
+                'r' => intval($avg_r / $total_pixels),
+                'g' => intval($avg_g / $total_pixels),
+                'b' => intval($avg_b / $total_pixels)
+            )
+        );
+    }
+    
+    /**
+     * Check if RGB values represent skin color
+     */
+    private function is_skin_color($r, $g, $b) {
+        // Multiple skin tone detection methods
+        
+        // Method 1: RGB-based skin detection
+        $rgb_skin = ($r > 95 && $g > 40 && $b > 20 && 
+                    ($r - $g) > 15 && $r > $g && $r > $b);
+        
+        // Method 2: YCbCr color space (more accurate)
+        $y = 0.299 * $r + 0.587 * $g + 0.114 * $b;
+        $cb = -0.169 * $r - 0.331 * $g + 0.500 * $b + 128;
+        $cr = 0.500 * $r - 0.419 * $g - 0.081 * $b + 128;
+        
+        $ycbcr_skin = ($y > 80 && $cb >= 85 && $cb <= 135 && $cr >= 135 && $cr <= 180);
+        
+        return $rgb_skin || $ycbcr_skin;
+    }
+    
+    /**
+     * Find clothing regions using color clustering
+     */
+    private function find_clothing_color_clusters($image_resource, $width, $height, $skin_areas) {
+        $clusters = array();
+        
+        // Focus on torso area (likely clothing area)
+        $torso_x1 = intval($width * 0.2);
+        $torso_y1 = intval($height * 0.25);
+        $torso_x2 = intval($width * 0.8);
+        $torso_y2 = intval($height * 0.75);
+        
+        // Sample colors in torso region, excluding skin areas
+        $color_samples = array();
+        $sample_step = max(3, intval(min($width, $height) / 50));
+        
+        for ($y = $torso_y1; $y < $torso_y2; $y += $sample_step) {
+            for ($x = $torso_x1; $x < $torso_x2; $x += $sample_step) {
+                // Skip if this pixel is likely skin
+                if (!$this->is_pixel_in_skin_area($x, $y, $skin_areas)) {
+                    $rgb = imagecolorat($image_resource, $x, $y);
+                    $color_samples[] = array(
+                        'x' => $x,
+                        'y' => $y,
+                        'r' => ($rgb >> 16) & 0xFF,
+                        'g' => ($rgb >> 8) & 0xFF,
+                        'b' => $rgb & 0xFF
+                    );
+                }
+            }
+        }
+        
+        // Group similar colors
+        $color_groups = $this->cluster_similar_colors($color_samples);
+        
+        // Convert color groups to clothing areas
+        foreach ($color_groups as $group) {
+            if (count($group) > 5) { // Minimum size for clothing area
+                $bounds = $this->calculate_area_bounds($group);
+                $clusters[] = array(
+                    'bounds' => $bounds,
+                    'confidence' => min(1.0, count($group) / 20),
+                    'type' => 'color_cluster',
+                    'pixel_count' => count($group),
+                    'avg_color' => $this->calculate_average_color($group)
+                );
+            }
+        }
+        
+        return $clusters;
+    }
+    
+    /**
+     * Find torso region that likely contains clothing
+     */
+    private function find_torso_clothing_region($image_resource, $width, $height, $skin_areas) {
+        // Define expected torso/clothing area
+        $clothing_x1 = intval($width * 0.25);
+        $clothing_y1 = intval($height * 0.3);
+        $clothing_x2 = intval($width * 0.75);
+        $clothing_y2 = intval($height * 0.7);
+        
+        // Analyze this region
+        $non_skin_pixels = 0;
+        $total_sampled = 0;
+        $dominant_colors = array();
+        
+        $step = max(2, intval(min($width, $height) / 100));
+        for ($y = $clothing_y1; $y < $clothing_y2; $y += $step) {
+            for ($x = $clothing_x1; $x < $clothing_x2; $x += $step) {
+                $total_sampled++;
+                if (!$this->is_pixel_in_skin_area($x, $y, $skin_areas)) {
+                    $non_skin_pixels++;
+                    
+                    $rgb = imagecolorat($image_resource, $x, $y);
+                    $color_key = intval(($rgb >> 16) & 0xF0) . '_' . intval(($rgb >> 8) & 0xF0) . '_' . intval($rgb & 0xF0);
+                    $dominant_colors[$color_key] = ($dominant_colors[$color_key] ?? 0) + 1;
+                }
+            }
+        }
+        
+        $confidence = $total_sampled > 0 ? ($non_skin_pixels / $total_sampled) : 0;
+        
+        return array(
+            'bounds' => array(
+                'x1' => $clothing_x1,
+                'y1' => $clothing_y1,
+                'x2' => $clothing_x2,
+                'y2' => $clothing_y2
+            ),
+            'confidence' => $confidence,
+            'type' => 'torso_region',
+            'dominant_colors' => array_keys(array_slice(arsort($dominant_colors) ? $dominant_colors : array(), 0, 3, true))
+        );
+    }
+    
+    /**
+     * Check if pixel is within skin areas
+     */
+    private function is_pixel_in_skin_area($px, $py, $skin_areas) {
+        foreach ($skin_areas as $area) {
+            if ($px >= $area['x'] && $px <= $area['x'] + $area['width'] &&
+                $py >= $area['y'] && $py <= $area['y'] + $area['height']) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Cluster similar colors together
+     */
+    private function cluster_similar_colors($color_samples) {
+        $clusters = array();
+        $used = array();
+        
+        foreach ($color_samples as $i => $sample) {
+            if (isset($used[$i])) continue;
+            
+            $cluster = array($sample);
+            $used[$i] = true;
+            
+            // Find similar colors
+            for ($j = $i + 1; $j < count($color_samples); $j++) {
+                if (isset($used[$j])) continue;
+                
+                $distance = $this->color_distance($sample, $color_samples[$j]);
+                if ($distance < 50) { // Similarity threshold
+                    $cluster[] = $color_samples[$j];
+                    $used[$j] = true;
+                }
+            }
+            
+            if (count($cluster) >= 5) {
+                $clusters[] = $cluster;
+            }
+        }
+        
+        return $clusters;
+    }
+    
+    /**
+     * Calculate color distance between two color samples
+     */
+    private function color_distance($color1, $color2) {
+        $dr = $color1['r'] - $color2['r'];
+        $dg = $color1['g'] - $color2['g'];
+        $db = $color1['b'] - $color2['b'];
+        return sqrt($dr * $dr + $dg * $dg + $db * $db);
+    }
+    
+    /**
+     * Calculate bounds of a color cluster
+     */
+    private function calculate_area_bounds($cluster) {
+        $min_x = min(array_column($cluster, 'x'));
+        $max_x = max(array_column($cluster, 'x'));
+        $min_y = min(array_column($cluster, 'y'));
+        $max_y = max(array_column($cluster, 'y'));
+        
+        return array(
+            'x1' => $min_x,
+            'y1' => $min_y,
+            'x2' => $max_x,
+            'y2' => $max_y
+        );
+    }
+    
+    /**
+     * Calculate average color of a cluster
+     */
+    private function calculate_average_color($cluster) {
+        $avg_r = intval(array_sum(array_column($cluster, 'r')) / count($cluster));
+        $avg_g = intval(array_sum(array_column($cluster, 'g')) / count($cluster));
+        $avg_b = intval(array_sum(array_column($cluster, 'b')) / count($cluster));
+        
+        return array('r' => $avg_r, 'g' => $avg_g, 'b' => $avg_b);
+    }
+    
+    /**
+     * Get estimated clothing area as fallback
+     */
+    private function get_estimated_clothing_area($width, $height) {
+        return array(
+            'bounds' => array(
+                'x1' => intval($width * 0.3),
+                'y1' => intval($height * 0.35),
+                'x2' => intval($width * 0.7),
+                'y2' => intval($height * 0.65)
+            ),
+            'confidence' => 0.5,
+            'type' => 'estimated_area'
+        );
+    }
+    
+    /**
+     * Apply advanced color transformation to detected clothing areas
+     */
+    private function apply_advanced_color_transformation($image_resource, $clothing_areas, $target_color, $width, $height) {
+        error_log('AI Photo Recreator: Applying advanced color transformation: ' . $target_color);
+        
+        // Get target color RGB values
+        $target_rgb = $this->get_target_color_rgb($target_color);
+        if (!$target_rgb) {
+            error_log('AI Photo Recreator: Unknown target color: ' . $target_color);
+            return;
+        }
+        
+        // Apply transformation to each clothing area
+        foreach ($clothing_areas as $area) {
+            $this->transform_area_color($image_resource, $area, $target_rgb);
+        }
+    }
+    
+    /**
+     * Get RGB values for target color
+     */
+    private function get_target_color_rgb($color_name) {
+        $color_map = array(
+            'black' => array('r' => 30, 'g' => 30, 'b' => 30),
+            'siyah' => array('r' => 30, 'g' => 30, 'b' => 30),
+            'white' => array('r' => 240, 'g' => 240, 'b' => 240),
+            'beyaz' => array('r' => 240, 'g' => 240, 'b' => 240),
+            'red' => array('r' => 200, 'g' => 50, 'b' => 50),
+            'kırmızı' => array('r' => 200, 'g' => 50, 'b' => 50),
+            'blue' => array('r' => 50, 'g' => 100, 'b' => 200),
+            'mavi' => array('r' => 50, 'g' => 100, 'b' => 200),
+            'green' => array('r' => 50, 'g' => 180, 'b' => 50),
+            'yeşil' => array('r' => 50, 'g' => 180, 'b' => 50),
+            'yellow' => array('r' => 220, 'g' => 220, 'b' => 50),
+            'sarı' => array('r' => 220, 'g' => 220, 'b' => 50)
+        );
+        
+        $normalized_color = strtolower(trim($color_name, '"\''));
+        return $color_map[$normalized_color] ?? null;
+    }
+    
+    /**
+     * Transform color in a specific area while preserving texture and lighting
+     */
+    private function transform_area_color($image_resource, $area, $target_rgb) {
+        $bounds = $area['bounds'];
+        $confidence = $area['confidence'] ?? 0.7;
+        
+        // Calculate transformation strength based on confidence
+        $strength = min(1.0, $confidence * 1.5);
+        
+        for ($y = $bounds['y1']; $y <= $bounds['y2']; $y++) {
+            for ($x = $bounds['x1']; $x <= $bounds['x2']; $x++) {
+                if ($x >= imagesx($image_resource) || $y >= imagesy($image_resource)) continue;
+                
+                $current_rgb = imagecolorat($image_resource, $x, $y);
+                $current_r = ($current_rgb >> 16) & 0xFF;
+                $current_g = ($current_rgb >> 8) & 0xFF;
+                $current_b = $current_rgb & 0xFF;
+                
+                // Skip if this looks like skin
+                if ($this->is_skin_color($current_r, $current_g, $current_b)) {
+                    continue;
+                }
+                
+                // Calculate luminance to preserve lighting
+                $luminance = 0.299 * $current_r + 0.587 * $current_g + 0.114 * $current_b;
+                $target_luminance = 0.299 * $target_rgb['r'] + 0.587 * $target_rgb['g'] + 0.114 * $target_rgb['b'];
+                
+                // Adjust target color to match original luminance (preserve lighting)
+                $luminance_factor = $target_luminance > 0 ? $luminance / $target_luminance : 1;
+                $adjusted_r = min(255, intval($target_rgb['r'] * $luminance_factor));
+                $adjusted_g = min(255, intval($target_rgb['g'] * $luminance_factor));
+                $adjusted_b = min(255, intval($target_rgb['b'] * $luminance_factor));
+                
+                // Blend with original color for smooth transition
+                $final_r = intval($current_r * (1 - $strength) + $adjusted_r * $strength);
+                $final_g = intval($current_g * (1 - $strength) + $adjusted_g * $strength);
+                $final_b = intval($current_b * (1 - $strength) + $adjusted_b * $strength);
+                
+                // Apply the color
+                $new_color = imagecolorallocate($image_resource, $final_r, $final_g, $final_b);
+                if ($new_color !== false) {
+                    imagesetpixel($image_resource, $x, $y, $new_color);
+                }
+            }
+        }
+        
+        error_log('AI Photo Recreator: Transformed area with confidence ' . $confidence);
+    }
+    
+    /**
+     * Create edge map for better detection (simplified implementation)
+     */
+    private function create_edge_map($image_resource, $width, $height) {
+        // This would normally use more sophisticated edge detection
+        // For now, return empty array as we have other detection methods
+        return array();
+    }
+    
+    /**
+     * Apply selective darkening for black clothing simulation (DEPRECATED - replaced by advanced method)
      */
     private function apply_selective_darkening($image_resource, $width, $height) {
         // Apply targeted darkening to simulate black clothing
@@ -5201,8 +5586,78 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     }
     
     private function analyze_turkish_cases($lower) {
-        // Basic Turkish case analysis
-        return array('cases_detected' => true);
+        $analysis = array();
+        
+        // Detect possessive forms (genitive case) - especially for clothing
+        $possessive_patterns = array(
+            // Shirt/gömlek possessive forms
+            'shirt_possessive' => array(
+                '/gömleğinin\s+reng?ini?/i' => array('item' => 'gömlek', 'property' => 'renk', 'action' => 'change'),
+                '/gömleğin\s+reng?ini?/i' => array('item' => 'gömlek', 'property' => 'renk', 'action' => 'change'),
+                '/gömlekte?ki?\s+reng?i/i' => array('item' => 'gömlek', 'property' => 'renk', 'action' => 'change'),
+                '/tişörtünün\s+reng?ini?/i' => array('item' => 'tişört', 'property' => 'renk', 'action' => 'change'),
+                '/ceketinin\s+reng?ini?/i' => array('item' => 'ceket', 'property' => 'renk', 'action' => 'change')
+            ),
+            // Other possessive forms
+            'general_possessive' => array(
+                '/(\w+)nin\s+(\w+)ini?/i' => 'possessive_accusative',
+                '/(\w+)nın\s+(\w+)ini?/i' => 'possessive_accusative',
+                '/(\w+)inin\s+(\w+)ini?/i' => 'possessive_accusative'
+            )
+        );
+        
+        // Check for clothing possessive patterns
+        $analysis['clothing_possessive_detected'] = false;
+        $analysis['detected_patterns'] = array();
+        
+        foreach ($possessive_patterns['shirt_possessive'] as $pattern => $details) {
+            if (preg_match($pattern, $lower, $matches)) {
+                $analysis['clothing_possessive_detected'] = true;
+                $analysis['detected_patterns'][] = array(
+                    'pattern' => $pattern,
+                    'match' => $matches[0],
+                    'item' => $details['item'],
+                    'property' => $details['property'],
+                    'action' => $details['action']
+                );
+                error_log('AI Photo Recreator: Detected Turkish clothing pattern: ' . $matches[0]);
+            }
+        }
+        
+        // Detect color specifications in quotes
+        $color_patterns = array(
+            '/["\']([^"\']+)["\']/' => 'quoted_color',
+            '/(siyah|beyaz|kırmızı|mavi|yeşil|sarı|turuncu|mor|pembe|gri)\b/i' => 'turkish_color',
+            '/(black|white|red|blue|green|yellow|orange|purple|pink|gray)\b/i' => 'english_color'
+        );
+        
+        $analysis['color_specifications'] = array();
+        foreach ($color_patterns as $pattern => $type) {
+            if (preg_match_all($pattern, $lower, $matches, PREG_SET_ORDER)) {
+                foreach ($matches as $match) {
+                    $analysis['color_specifications'][] = array(
+                        'color' => $match[1] ?? $match[0],
+                        'type' => $type,
+                        'original_text' => $match[0]
+                    );
+                    error_log('AI Photo Recreator: Detected color specification: ' . ($match[1] ?? $match[0]));
+                }
+            }
+        }
+        
+        // Detect imperative action verbs
+        $action_patterns = array(
+            '/\b(yap|et|koy|değiştir|dönüştür)\b/i' => 'imperative_action'
+        );
+        
+        $analysis['action_verbs'] = array();
+        foreach ($action_patterns as $pattern => $type) {
+            if (preg_match_all($pattern, $lower, $matches)) {
+                $analysis['action_verbs'] = array_merge($analysis['action_verbs'], $matches[0]);
+            }
+        }
+        
+        return $analysis;
     }
     
     /**
@@ -5245,7 +5700,32 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     private function analyze_clothing_transformations($original, $lower) {
         $transformations = array();
         
-        // Enhanced Turkish and English clothing items with comprehensive grammar variations
+        // First check for Turkish possessive patterns using advanced analysis
+        $turkish_analysis = $this->analyze_turkish_cases($lower);
+        
+        if ($turkish_analysis['clothing_possessive_detected']) {
+            // Direct pattern detected - use the results
+            foreach ($turkish_analysis['detected_patterns'] as $pattern) {
+                $transformations['target_clothing'][] = $pattern['item'];
+                $transformations['transformation_type'] = 'clothing_modification';
+                $transformations['clothing_actions'][] = 'color_change';
+                
+                error_log('AI Photo Recreator: Turkish pattern detected - Item: ' . $pattern['item'] . ', Action: ' . $pattern['action']);
+            }
+            
+            // Extract target colors from Turkish analysis
+            if (!empty($turkish_analysis['color_specifications'])) {
+                $transformations['target_colors'] = array();
+                foreach ($turkish_analysis['color_specifications'] as $color_spec) {
+                    $transformations['target_colors'][] = $color_spec['color'];
+                    error_log('AI Photo Recreator: Target color detected: ' . $color_spec['color']);
+                }
+            }
+            
+            return $transformations;
+        }
+        
+        // Fallback to original clothing detection method
         $clothing_items = array(
             'shirt' => array(
                 'shirt', 'gömlek', 'gömleğin', 'gömleğinin', 'gömleği', 'gömlekte', 'gömleğe', 'gömleğini',
@@ -5286,13 +5766,12 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
                 if (strpos($lower, strtolower($variant)) !== false) {
                     $detected_clothing[] = $item;
                     error_log("AI Photo Recreator: Detected clothing item: {$item} (variant: {$variant})");
-                    break; // Found this item, move to next clothing type
+                    break;
                 }
             }
         }
         
         if (!empty($detected_clothing)) {
-            // Remove duplicates  
             $detected_clothing = array_unique($detected_clothing);
             $transformations['target_clothing'] = $detected_clothing;
             $transformations['transformation_type'] = 'clothing_modification';
@@ -6519,22 +6998,6 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
         $face_area_height = $image_height * 0.3;
         
         return $y < $face_area_height;
-    }
-    private function get_target_color_rgb($color_name) {
-        $colors = array(
-            'black' => array('r' => 20, 'g' => 20, 'b' => 20),
-            'siyah' => array('r' => 20, 'g' => 20, 'b' => 20),
-            'white' => array('r' => 240, 'g' => 240, 'b' => 240),
-            'beyaz' => array('r' => 240, 'g' => 240, 'b' => 240),
-            'red' => array('r' => 200, 'g' => 50, 'b' => 50),
-            'kırmızı' => array('r' => 200, 'g' => 50, 'b' => 50),
-            'blue' => array('r' => 50, 'g' => 100, 'b' => 200),
-            'mavi' => array('r' => 50, 'g' => 100, 'b' => 200),
-            'green' => array('r' => 50, 'g' => 150, 'b' => 50),
-            'yeşil' => array('r' => 50, 'g' => 150, 'b' => 50)
-        );
-        
-        return $colors[strtolower($color_name)] ?? $colors['black'];
     }
     
     /**
