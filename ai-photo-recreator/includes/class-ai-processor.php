@@ -7940,45 +7940,6 @@ Be extremely specific and detailed as this will be used to recreate the exact sc
     }
     
     /**
-     * Convert RGB to HSV color space
-     */
-    private function rgb_to_hsv($r, $g, $b) {
-        $r /= 255;
-        $g /= 255;
-        $b /= 255;
-        
-        $max = max($r, $g, $b);
-        $min = min($r, $g, $b);
-        $delta = $max - $min;
-        
-        // Hue calculation
-        $h = 0;
-        if ($delta !== 0) {
-            switch ($max) {
-                case $r:
-                    $h = 60 * (($g - $b) / $delta);
-                    break;
-                case $g:
-                    $h = 60 * ((($b - $r) / $delta) + 2);
-                    break;
-                case $b:
-                    $h = 60 * ((($r - $g) / $delta) + 4);
-                    break;
-            }
-        }
-        
-        if ($h < 0) $h += 360;
-        
-        // Saturation calculation
-        $s = ($max === 0) ? 0 : $delta / $max;
-        
-        // Value calculation
-        $v = $max;
-        
-        return array('h' => $h, 's' => $s, 'v' => $v);
-    }
-    
-    /**
      * Convert HSV to RGB color space
      */
     private function hsv_to_rgb($h, $s, $v) {
